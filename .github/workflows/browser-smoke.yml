@@ -1,0 +1,52 @@
+name: Browser MP4 video smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'browser_tests/**'
+      - 'src/web/**'
+      - 'src/vision/**'
+      - 'playwright.config.ts'
+      - 'package.json'
+      - '.github/workflows/browser-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Node dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium and media codecs
+        run: |
+          npx playwright install --with-deps chromium
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+      - name: Generate genuine H264 video test clip
+        run: |
+          ffmpeg -hide_banner -loglevel error -y -f lavfi \
+            -i "testsrc2=size=320x240:rate=30" -t 4 \
+            -an -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
+            -movflags +faststart public/__smoke_video.mp4
+      - name: Test real decoded video frames and browser auto archive
+        run: npm run test:browser
+      - name: Upload browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-browser-debug
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
