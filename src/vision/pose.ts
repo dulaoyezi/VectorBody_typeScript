@@ -62,12 +62,32 @@ export function drawSkeleton(canvas:HTMLCanvasElement,points:DetectedPoint[]|nul
     ctx.beginPath();ctx.arc(p.x*width,p.y*height,Math.max(2.5,width/210),0,Math.PI*2);ctx.fill();
   }
 }
-export function captureFrame(video:HTMLVideoElement,points:DetectedPoint[]|null) {
+/** Combined photograph, bone overlay and issue circles analogous to Python report_evidence.py. */
+export function captureFrame(
+  video:HTMLVideoElement,points:DetectedPoint[]|null,
+  findings:ReadonlyArray<{region:string;severity:string}>=[]
+) {
   const width=Math.min(video.videoWidth||640,720);
   const height=Math.round(width*(video.videoHeight||480)/(video.videoWidth||640));
   const canvas=document.createElement("canvas");
   drawSkeleton(canvas,points,width,height,video);
-  return canvas.toDataURL("image/jpeg",0.72);
+  if(points?.length===33){
+    const ctx=canvas.getContext("2d");
+    const joints:Record<string,number[]>={
+      knees:[25,26],ankles:[27,28],shoulders:[11,12],
+      spine:[11,12,23,24],neck:[0,11,12],pelvis:[23,24]
+    };
+    if(ctx) for(const finding of findings.slice(0,3)){
+      const ids=(joints[finding.region]||[]).filter(i=>(points[i].visibility||0)>=0.30);
+      if(!ids.length)continue;
+      const x=ids.reduce((s,i)=>s+points[i].x,0)/ids.length*width;
+      const y=ids.reduce((s,i)=>s+points[i].y,0)/ids.length*height;
+      ctx.strokeStyle=finding.severity==="high"?"#d95f4b":"#dfa63e";
+      ctx.lineWidth=Math.max(3,width/240);
+      ctx.beginPath();ctx.arc(x,y,Math.max(19,Math.min(width,height)/30),0,2*Math.PI);ctx.stroke();
+    }
+  }
+  return canvas.toDataURL("image/jpeg",0.78);
 }
 
 /** Original photograph (without MediaPipe annotations) for the Python-style evidence report. */

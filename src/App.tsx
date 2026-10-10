@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import PythonHero from "./components/PythonHero";
 import PythonHomeSections from "./components/PythonHomeSections";
-import AnatomyView from "./components/AnatomyView";
+import AnatomyView, { buildFindings } from "./components/AnatomyView";
 import ReportDocument from "./components/ReportDocument";
 import { centered, inView, VectorBodyEngine } from "./core/compensationRiskEngine";
 import { GUIDANCE, POSES, type DetectedPoint, type Level, type PoseId, type SavedReport, type ScoreResult, type Source, type View } from "./core/types";
@@ -155,7 +155,7 @@ export default function App() {
           if(!scored)return;
           setResult(scored);setMessage("正在检测 · 可随时调整动作重新评价");
           if(!session.best||scored.score>session.best.score){
-            session.best=scored;session.bestPhoto=captureFrame(video,pts);
+            session.best=scored;session.bestPhoto=captureFrame(video,pts,buildFindings(scored));
             session.bestOriginalPhoto=captureOriginalFrame(video);
             setBestImage(session.bestPhoto);setBestOriginalImage(session.bestOriginalPhoto);setSaved(false);
           }
@@ -222,7 +222,7 @@ export default function App() {
             if(scored){
               good++;
               if(!best||scored.score>best.score){
-                best=scored;bestPhoto=captureFrame(el,pts);bestOriginalPhoto=captureOriginalFrame(el);
+                best=scored;bestPhoto=captureFrame(el,pts,buildFindings(scored));bestOriginalPhoto=captureOriginalFrame(el);
               }
             }
           }
@@ -363,7 +363,7 @@ export default function App() {
               <ScoreView result={result}/>
               <details className="anatomy-inline"><summary>人体骨骼 / 肌肉 · 代偿风险部位</summary><AnatomyView result={result}/></details>
               <div className="archive-actions">
-                <label className="checkline"><input type="checkbox" checked={includeImage} onChange={e=>setIncludeImage(e.target.checked)}/>经受评者同意，在当前浏览器中保存原图与骨架标注图</label>
+                <label className="checkline"><input type="checkbox" checked={includeImage} onChange={e=>setIncludeImage(e.target.checked)}/>经受评者同意，在当前浏览器中保存原图与骨架标注图（供日后 PDF 使用）</label>
                 <button className="primary stretch" disabled={saved} onClick={()=>void archive()}>{saved?"本次已保存 ✓":"保存本次评估报告"}</button>
                 <button className="secondary stretch" onClick={printCurrentReport}>打印 / 保存 PDF 报告</button>
                 <button className="secondary stretch" onClick={()=>speak(result.advice)}>朗读纠正建议</button>
