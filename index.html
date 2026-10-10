@@ -61,6 +61,7 @@
    <div class="risk-strip"><span><svg><use href="#i-shield"/></svg> 代偿风险</span><strong id="live-risk">待评价</strong></div>
    <details class="anatomy-details"><summary>骨骼与肌肉视图 · 重点关注部位 <svg><use href="#i-chevron"/></svg></summary><div id="live-anatomy-host" class="anatomy-host"><p class="subtle-caption">完成有效评分后显示可视化位置提示。</p></div></details>
    <details class="tech-details"><summary>查看技术诊断依据 <svg><use href="#i-chevron"/></svg></summary><div id="live-tech">等待真实检测数据…</div></details>
+    <div class="report-actions"><button class="btn primary" id="save-live-report" type="button" disabled>保存本次评估报告</button><button class="btn outline" id="print-live-report" type="button" disabled>打印 / 保存PDF报告</button></div>
   </div>
  </div>
 </section>
@@ -79,14 +80,15 @@
    <div class="data-inline"><div><span>最佳表现时刻</span><strong id="best-time">—</strong></div><div><span>有效评分帧数</span><strong id="valid-frames">—</strong></div><div><span>代偿风险</span><strong id="video-risk">—</strong></div></div>
    <details class="anatomy-details"><summary>骨骼与肌肉视图 · 重点关注部位 <svg><use href="#i-chevron"/></svg></summary><div id="video-anatomy-host" class="anatomy-host"><p class="subtle-caption">完成有效评分后显示可视化位置提示。</p></div></details>
    <details class="tech-details"><summary>查看拓扑、DLS与分项指标 <svg><use href="#i-chevron"/></svg></summary><div id="video-tech">等待真实检测数据…</div></details>
-   <button class="btn outline wide" id="show-video-report" disabled><svg><use href="#i-report"/></svg> 查看完整报告</button>
+   <div class="report-actions"><button class="btn primary" id="save-video-report" type="button" disabled>保存本次评估报告</button><button class="btn outline" id="print-video-report" type="button" disabled>打印 / 保存PDF报告</button></div>
+    <button class="btn outline wide" id="show-video-report" disabled><svg><use href="#i-report"/></svg> 查看完整报告</button>
   </div>
  </div>
 </section>
 
 <section id="page-reports" class="page">
  <div class="page-intro"><div><span class="section-kicker">ASSESSMENT ARCHIVE</span><h2>评估报告与历史记录</h2><p>保存动作成绩、技术诊断与纠正建议，便于后续复核和比较练习表现。</p></div><button class="btn outline" id="refresh-reports"><svg><use href="#i-activity"/></svg>刷新记录</button></div>
- <div class="panel reports-panel"><div class="panel-title"><span><svg><use href="#i-report"/></svg> 评估记录</span><span class="subtle-caption">每份新报告保留最佳帧原图及骨架标注图；不保存完整视频。照片存储于当前服务器</span></div><div id="reports-list" class="report-list"><div class="empty-message">尚无评估记录，先完成一次动作评估。</div></div></div>
+ <div class="panel reports-panel"><div class="panel-title"><span><svg><use href="#i-report"/></svg> 评估记录</span><span class="subtle-caption">每份新报告保留最佳帧原图及骨架标注图；不保存完整视频。照片仅保存在当前浏览器；不同设备不会自动同步</span></div><div id="reports-list" class="report-list"><div class="empty-message">尚无评估记录，先完成一次动作评估。</div></div></div>
  <div id="report-detail" class="panel detail-panel" hidden><div class="panel-title"><span><svg><use href="#i-report"/></svg> 图像证据与完整评估报告</span><button class="btn subtle" id="print-report"><svg><use href="#i-download"/></svg>打印 / 保存PDF</button></div><div id="report-content"></div></div>
 </section>
 </main>
