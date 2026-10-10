@@ -25,6 +25,9 @@ export async function listReports():Promise<SavedReport[]> {
 export async function saveReport(report:SavedReport):Promise<void> {
   await withStore<IDBValidKey>("readwrite",s=>s.put(report));
 }
+export async function readReport(id:string):Promise<SavedReport|undefined> {
+  return await withStore<SavedReport|undefined>("readonly",s=>s.get(id));
+}
 export async function deleteReport(id:string):Promise<void> {
   await withStore<undefined>("readwrite",s=>s.delete(id));
 }

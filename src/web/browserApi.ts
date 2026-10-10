@@ -12,7 +12,7 @@
 import { VectorBodyEngine, centered, inView } from "../core/compensationRiskEngine";
 import { GUIDANCE, POSES, type DetectedPoint, type Level, type PoseId, type ScoreResult, type View, type SavedReport } from "../core/types";
 import { createPoseDetector, type PoseDetector } from "../vision/pose";
-import { listReports, saveReport, deleteReport } from "../utils/reports";
+import { listReports, saveReport, deleteReport, readReport } from "../utils/reports";
 import { buildFindings, type Finding } from "./reportEvidence";
 import { inferVideoFps } from "./videoFps";
 import { BrowserVideoDecoder } from "./videoDecoder";
@@ -144,7 +144,20 @@ async function archive(opts:Options,source:"live"|"video",result:PythonResult,
     result:result as unknown as ScoreResult,
     originalImage:original??undefined,image:skeleton??undefined
   };
-  await saveReport(r);
+  try{
+    await saveReport(r);
+    const checked=await readReport(id);
+    if(!checked||checked.studentName!==opts.studentName||checked.result.score!==result.score||
+      (!!original&&!checked.originalImage)||(!!skeleton&&!checked.image))
+      throw new Error("档案写入后校验失败，未能确认原图、骨架图与评分已保存。");
+  }catch(e){
+    const cause=e instanceof Error?e.message:String(e);
+    const guidance=/QuotaExceededError|quota|空间|storage/i.test(cause)
+      ?"可能是浏览器本地存储空间不足；请清理不需要的旧评估报告。":
+      /SecurityError|InvalidStateError|denied|不可用/i.test(cause)
+      ?"可能是无痕模式或浏览器禁止本地存储；请允许此网站使用本地存储。":"请检查浏览器本地存储权限。";
+    throw new Error("评分已完成，但自动归档失败："+cause+" "+guidance);
+  }
   return id;
 }
 function reportBody(record:SavedReport):PythonResult{
