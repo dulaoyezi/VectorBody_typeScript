@@ -25,7 +25,7 @@
 需明确：**跨编程语言、跨 MediaPipe 运行环境，不可能在未经实测前保证两个版本逐帧像素和评分完全相同。**
 
 - 原 Python Web 使用 `mediapipe.solutions.pose.Pose` + OpenCV；本项目使用浏览器 `@mediapipe/tasks-vision`。两者虽然都输出33点，但模型与解码误差可能造成评分差异。需要在**同一段视频**上比较 S1/S2/S3、最佳帧、MAE和风险提示。
-- 原 Python 使用 OpenCV 获取真实视频帧率并按帧号取样；HTMLVideoElement **不直接暴露源帧率**，当前默认按30fps估算帧索引（相当于15次采样/秒）。非30fps视频不保证取到同一帧。部分AVI／MKV视频浏览器本身不支持解码。
+- 原 Python 使用 OpenCV 获取视频真实帧率并按帧号取样；HTMLVideoElement **不直接暴露源帧率**。本项目已加入 TypeScript MP4/MOV 容器 `moov/trak/mdhd/stts` 平均帧率提取，无法读取时仍按原默认30fps估算。浏览器的随机帧解码也不保证与 OpenCV 落在完全相同的帧。部分 AVI／MKV 不能在浏览器中解码。
 - 原 Python Web 的报告保存在服务器 SQLite，所有获准访问服务器的用户共享存档；为了在不运行 Python 服务器的静态托管平台上使用，本项目当前保存到**当前浏览器的 IndexedDB**，不同设备**不共享**。因此不能声称数据存储行为已经一比一复刻；需要独立的 TypeScript Node 服务与服务端 SQLite 才能完全恢复这点。
 - 原仓库还包含 **PySide6 Windows 桌面应用**及额外工具脚本；本项目的迁移范围是 Python Web 版，并未把 Qt 桌面系统伪称为浏览器产品。
 - S3只是视觉支撑／代偿代理，不是肌肉力或诊断结论。
@@ -71,7 +71,7 @@ MediaPipe 模型仍采用浏览器外部资源：
 | `index.html`, `src/web/styles.css`, `src/web/main.ts` | `web/index.html`, `web/styles.css`, `web/app.js` |
 | `src/web/browserApi.ts` | `web_app.py` 的会话、评分、录像、报告业务流程 |
 | `src/web/reportEvidence.ts` | `report_evidence.py` 的分项风险及位置映射 |
-| `src/web/pythonParity.ts` | `web_app.py` 的帧率步长、稳定判定等常量 |
+| `src/web/pythonParity.ts`, `src/web/videoFps.ts` | `web_app.py` 的帧率步长、稳定判定等常量；从 MP4 元数据推算帧率 |
 | `src/core/compensationRiskEngine.ts`, `profiles.json` | `core/compensation_risk_engine.py` |
 | `src/core/humanTopology.ts` | `core/human_topology.py` |
 | `src/core/topologyIK.ts` | `core/topology_ik.py` |

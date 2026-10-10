@@ -1,3 +1,4 @@
+import { PYTHON_VIDEO_DEFAULT_FPS } from "./pythonParity";
 /**
  * MP4 frame-rate metadata reader for browser video analysis.
  * Python Web uses CAP_PROP_FPS and processes every second decoded frame.
@@ -72,7 +73,7 @@ export function fpsFromMp4(bytes:Uint8Array):number|null{
   return null;
 }
 export async function inferVideoFps(file:File):Promise<number>{
-  if(!/\.(mp4|mov|m4v)$/i.test(file.name))return 30;
+  if(!/\.(mp4|mov|m4v)$/i.test(file.name))return PYTHON_VIDEO_DEFAULT_FPS;
   const length=Math.min(file.size,8*1024*1024);
   const first=new Uint8Array(await file.slice(0,length).arrayBuffer());
   let fps=fpsFromMp4(first);
@@ -80,5 +81,5 @@ export async function inferVideoFps(file:File):Promise<number>{
     const last=new Uint8Array(await file.slice(file.size-length).arrayBuffer());
     fps=fpsFromMp4(last);
   }
-  return fps??30;
+  return fps??PYTHON_VIDEO_DEFAULT_FPS;
 }

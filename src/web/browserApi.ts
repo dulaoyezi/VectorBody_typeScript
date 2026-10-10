@@ -16,7 +16,7 @@ import { listReports, saveReport, deleteReport } from "../utils/reports";
 import { buildFindings, type Finding } from "./reportEvidence";
 import { inferVideoFps } from "./videoFps";
 import { PYTHON_STABLE_CENTER_MOVE, PYTHON_STABLE_SECONDS,
-  PYTHON_VIDEO_FRAME_STRIDE, PYTHON_VIDEO_MAX_PROCESSED, PYTHON_VIDEO_DEFAULT_FPS,
+  PYTHON_VIDEO_FRAME_STRIDE, PYTHON_VIDEO_MAX_PROCESSED,
   PythonStableHold } from "./pythonParity";
 import { rounded } from "../core/math";
 
@@ -61,9 +61,6 @@ function displayPoints(points:DetectedPoint[]|null):[number,number,number][]|nul
 function centerPoint(display:[number,number,number][]):[number,number]{
   const joints=[11,12,23,24];
   return [joints.reduce((s,i)=>s+display[i][0],0)/4,joints.reduce((s,i)=>s+display[i][1],0)/4];
-}
-function freezeDisplay(display:[number,number,number][]):DetectedPoint[]{
-  return display.map(([x,y,visibility])=>({x,y,z:0,visibility}));
 }
 function pointsFromDisplay(display:[number,number,number][],actual:DetectedPoint[]):DetectedPoint[]{
   // The Python pipeline uses original full-precision pose landmarks for
@@ -160,7 +157,7 @@ function idParam(url:string):string{
   const part=url.split("/").filter(Boolean)[2];
   return decodeURIComponent(part??"");
 }
-async function videoMetadata(video:HTMLVideoElement,blob:Blob):Promise<void>{
+async function videoMetadata(video:HTMLVideoElement):Promise<void>{
   video.muted=true;video.preload="auto";video.playsInline=true;
   await new Promise<void>((resolve,reject)=>{
     if(video.readyState>=2 && Number.isFinite(video.duration))return resolve();
@@ -278,7 +275,7 @@ export async function browserApi(path:string,options:RequestInit={}):Promise<any
     video.src=url;video.style.display="none";document.body.appendChild(video);
     let model:PoseDetector|null=null;
     try{
-      await videoMetadata(video,file);
+      await videoMetadata(video);
       if(!Number.isFinite(video.duration)||video.duration<=0)throw new Error("视频长度无效。");
       model=await createPoseDetector();
       const engine=new VectorBodyEngine(opts.level);
