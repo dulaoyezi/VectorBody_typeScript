@@ -13,7 +13,10 @@ import { VectorBodyEngine, centered, inView } from "../core/compensationRiskEngi
 import { GUIDANCE, POSES, type DetectedPoint, type Level, type PoseId, type ScoreResult, type View, type SavedReport } from "../core/types";
 import { createPoseDetector, type PoseDetector } from "../vision/pose";
 import { listReports, saveReport, deleteReport } from "../utils/reports";
-import { buildFindings, type Finding } from "../components/AnatomyView";
+import { buildFindings } from "./reportEvidence";
+import { PYTHON_STABLE_CENTER_MOVE, PYTHON_STABLE_SECONDS,
+  PYTHON_VIDEO_FRAME_STRIDE, PYTHON_VIDEO_MAX_PROCESSED, PYTHON_VIDEO_DEFAULT_FPS,
+  PythonStableHold } from "./pythonParity";
 import { rounded } from "../core/math";
 
 interface Options { pose: PoseId; view: View; level: Level; studentName: string }
@@ -72,11 +75,7 @@ function realScore(score:ScoreResult,display:[number,number,number][],frameIndex
   for(const [key,v] of Object.entries(score.metrics))
     metrics[key]={value:floatRound(v.value,3),score:floatRound(v.score,3),
       stability:floatRound(v.stability,3),weight:floatRound(v.weight,3)};
-  const regions=buildFindings(score).map(x=>({
-    metric:x.metric,label:x.label,region:x.region,region_label:x.regionLabel,
-    severity:x.severity,score:floatRound(x.score,1),value:floatRound(x.value),
-    weight:floatRound(x.weight,3),advice:x.advice
-  }));
+  const regions=buildFindings(score.metrics,opts.pose,opts.view);
   return {
     score:floatRound(score.score),grade:score.grade,risk_pct:floatRound(score.riskPct),
     advice:score.advice,
@@ -231,11 +230,11 @@ export async function browserApi(path:string,options:RequestInit={}):Promise<any
       }
       const now=performance.now(),cp=centerPoint(display!);
       if(session.phase==="prepare"){
-        if(!session.lastCenter||Math.hypot(cp[0]-session.lastCenter[0],cp[1]-session.lastCenter[1])>=0.012)
+        if(!session.lastCenter||Math.hypot(cp[0]-session.lastCenter[0],cp[1]-session.lastCenter[1])>=PYTHON_STABLE_CENTER_MOVE)
           session.stableSince=now;
         session.lastCenter=cp;
         const elapsed=(now-(session.stableSince??now))/1000;
-        if(elapsed<2)return {...result,phase:"stabilizing",message:"请保持动作稳定 "+Math.min(2,elapsed).toFixed(1)+"/2.0 秒"};
+        if(elapsed<PYTHON_STABLE_SECONDS)return {...result,phase:"stabilizing",message:"请保持动作稳定 "+Math.min(2,elapsed).toFixed(1)+"/2.0 秒"};
         session.phase="hold";session.readyAt=now;result.voice="动作稳定，开始评估。";
       }
       session.lastCenter=cp;
@@ -284,10 +283,10 @@ export async function browserApi(path:string,options:RequestInit={}):Promise<any
       const engine=new VectorBodyEngine(opts.level);
       // Python OpenCV: read every 2nd decoded frame, limit to 1800 processed.
       // Browser HTMLVideoElement doesn't expose exact source FPS: 30 is fallback.
-      const fps=30,stride=2,maxProcessed=1800;
+      const fps=PYTHON_VIDEO_DEFAULT_FPS,stride=PYTHON_VIDEO_FRAME_STRIDE,maxProcessed=PYTHON_VIDEO_MAX_PROCESSED;
       const totalFrames=Math.min(maxProcessed,Math.floor(video.duration*fps/stride));
       let processed=0,good=0,best:PythonResult|null=null,original:string|null=null,skeleton:string|null=null;
-      let lastCenter:[number,number]|null=null,stableFrom:number|null=null;
+      const hold=new PythonStableHold();
       for(let frame=2;frame<=totalFrames*stride;frame+=stride){
         const t=frame/fps;
         if(t>=video.duration)break;
@@ -296,12 +295,10 @@ export async function browserApi(path:string,options:RequestInit={}):Promise<any
         const p=model.detect(video,t*1000);
         const display=displayPoints(p);
         if(!p||!display||!inView(p)||!centered(p,video.videoWidth,video.videoHeight)){
-          stableFrom=null;lastCenter=null;continue;
+          hold.reset();continue;
         }
         const current=centerPoint(display);
-        if(!lastCenter||Math.hypot(current[0]-lastCenter[0],current[1]-lastCenter[1])>=0.012)stableFrom=t;
-        lastCenter=current;
-        if(stableFrom===null||t-stableFrom<2)continue;
+        if(!hold.observe(t,current))continue;
         const scored=engine.analyze(p,opts.pose,opts.view);
         if(!scored)continue;
         good++;
