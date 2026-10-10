@@ -21,6 +21,13 @@ export interface ScoreResult {
   hold: { ready: boolean; phase: string; label: string; motionRatio: number; stability: number };
   metrics: Record<string, MetricScore>;
   landmarks: DetectedPoint[]; timeSec?: number; frameIndex?: number;
+  videoQuality?: VideoAnalysisQuality;
+}
+/** Quality label for uploaded videos. Fallback frames are never described as stable. */
+export interface VideoAnalysisQuality {
+  mode:"stable"|"unstable"|"partial";label:string;warning:string;
+  sampledFrames:number;detectedFrames:number;fullFrames:number;partialFrames:number;
+  scoredFrames:number;stableFrames:number;
 }
 export interface SavedReport {
   id: string; createdAt: string; source: Source;

@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import PythonHero from "./components/PythonHero";
 import PythonHomeSections from "./components/PythonHomeSections";
 import AnatomyView, { buildFindings } from "./components/AnatomyView";
+import { inspectVideoFrame, VideoHoldWindow } from "./core/videoSelection";
 import ReportDocument from "./components/ReportDocument";
 import { centered, inView, VectorBodyEngine } from "./core/compensationRiskEngine";
 import { GUIDANCE, POSES, type DetectedPoint, type Level, type PoseId, type SavedReport, type ScoreResult, type Source, type View } from "./core/types";
@@ -182,6 +183,7 @@ export default function App() {
     resetForNew();setResultStudentName(videoStudentName.trim());cancelVideo.current=false;setStatus("processing");setCurrentSource("video");
     setMessage("正在加载视频与 MediaPipe 模型…");
     let detector:PoseDetector|null=null,element:HTMLVideoElement|null=null,url:string|null=null;
+    type Candidate={result:ScoreResult;photo:string;originalPhoto:string};
     try {
       detector=await createPoseDetector();
       element=document.createElement("video");
@@ -196,47 +198,87 @@ export default function App() {
       });
       const duration=el.duration;
       if(!Number.isFinite(duration)||duration<=0)throw new Error("无法读取视频长度");
-      const limit=Math.min(duration,120); // Demo safety cap; avoid locking client for huge uploads.
+      const limit=Math.min(duration,120);
+      const stride=limit<=30?0.10:0.20; // Short clips use 10 FPS, closer to Python's denser sampling.
       const engine=new VectorBodyEngine(optionRef.current.level);
-      let stableFrom:number|null=null,lastCenter:[number,number]|null=null;
-      let best:ScoreResult|null=null,bestPhoto:string|null=null,bestOriginalPhoto:string|null=null,good=0;
-      let index=0;
-      for(let t=0;t<limit;t+=0.20){
+      const hold=new VideoHoldWindow();
+      let bestStable:Candidate|null=null,bestFull:Candidate|null=null,bestPartial:Candidate|null=null;
+      let total=0,detected=0,full=0,partial=0,scored=0,stable=0;
+      let lastEligibleTime=-Infinity;
+      for(let time=0;time<limit;time+=stride){
         if(cancelVideo.current)throw new Error("已取消视频分析");
-        if(t>0)await new Promise<void>((resolve,reject)=>{
+        const sampleTime=Math.min(time,Math.max(0,duration-0.025));
+        if(time>0)await new Promise<void>((resolve,reject)=>{
           const onSeek=()=>{el.removeEventListener("error",onError);resolve();};
           const onError=()=>{el.removeEventListener("seeked",onSeek);reject(new Error("视频跳帧失败"));};
           el.addEventListener("seeked",onSeek,{once:true});
           el.addEventListener("error",onError,{once:true});
-          el.currentTime=Math.min(t,duration-0.025);
+          el.currentTime=sampleTime;
         });
-        index++;
-        const pts=detector.detect(el,Math.round(t*1000)+1);
-        if(pts && inView(pts) && centered(pts,el.videoWidth,el.videoHeight)) {
-          const cx=(pts[11].x+pts[12].x+pts[23].x+pts[24].x)/4;
-          const cy=(pts[11].y+pts[12].y+pts[23].y+pts[24].y)/4;
-          if(!lastCenter||Math.hypot(cx-lastCenter[0],cy-lastCenter[1])>=0.012)stableFrom=t;
-          lastCenter=[cx,cy];
-          if(stableFrom!==null&&t-stableFrom>=2){
-            const scored=engine.analyze(pts,optionRef.current.pose,optionRef.current.view,t,index);
-            if(scored){
-              good++;
-              if(!best||scored.score>best.score){
-                best=scored;bestPhoto=captureFrame(el,pts,buildFindings(scored));bestOriginalPhoto=captureOriginalFrame(el);
-              }
+        total++;
+        const points=detector.detect(el,Math.round(time*1000)+1);
+        if(points)detected++;
+        const eligibility=inspectVideoFrame(points,el.videoWidth,el.videoHeight);
+        if(eligibility.tier==="none"){
+          hold.reset();
+        } else if(points){
+          if(time-lastEligibleTime>0.8 && lastEligibleTime!==-Infinity)engine.reset();
+          lastEligibleTime=time;
+          if(eligibility.tier==="full")full++;else partial++;
+          // Hold-ready frames are preferred, but lack of a hold is not a hard failure.
+          const steady=eligibility.tier==="full" ? hold.push(time,points) : (hold.reset(),false);
+          const outcome=engine.analyze(points,optionRef.current.pose,optionRef.current.view,time,total);
+          if(outcome) {
+            scored++;
+            if(steady)stable++;
+            const existing=steady?bestStable:eligibility.tier==="full"?bestFull:bestPartial;
+            if(!existing||outcome.score>existing.result.score) {
+              const candidate:Candidate={
+                result:outcome,
+                photo:captureFrame(el,points,buildFindings(outcome)),
+                originalPhoto:captureOriginalFrame(el)
+              };
+              if(steady)bestStable=candidate;
+              else if(eligibility.tier==="full")bestFull=candidate;
+              else bestPartial=candidate;
             }
           }
-        }else{stableFrom=null;lastCenter=null;}
-        if(index%4===0){
-          setProgress(Math.round(100*Math.min(1,t/limit)));
-          setMessage("正在逐帧分析 · "+Math.round(100*t/limit)+"% · 有效评分帧 "+good);
+        }
+        if(total%5===0){
+          const percent=Math.round(100*Math.min(1,time/limit));
+          setProgress(percent);
+          setMessage("正在分析 "+percent+"% · 识别到人体 "+detected+" 帧 · 可评分 "+scored+" 帧 · 稳定 "+stable+" 帧");
+          // Return control to React, avoiding a frozen interface during model inference.
           await new Promise<void>(resolve=>setTimeout(resolve,0));
         }
       }
-      if(!best)throw new Error("未找到稳定2秒以上的有效姿态，请确认全身入镜、正侧位及视频画面清晰。");
-      setResult(best);setBestImage(bestPhoto);setBestOriginalImage(bestOriginalPhoto);setProgress(100);
-      setMessage("分析完成：有效评分帧 "+good+"；最佳时刻 "+(best.timeSec??0).toFixed(1)+" 秒。可以保存报告。");
-    }catch(e){setMessage(String(e));}
+      const chosen=bestStable??bestFull??bestPartial;
+      if(!chosen){
+        throw new Error(
+          "视频中未发现能够可靠计算的关键点：采样 "+total+" 帧、检测到人体 "+detected+
+          " 帧，但可评分帧为 0。请确认视频能正常解码、人体基本入镜且主要关节未被遮挡。"
+        );
+      }
+      const mode=bestStable?"stable":bestFull?"unstable":"partial";
+      const statusLabel=mode==="stable"?"检测到稳定保持片段":
+        mode==="unstable"?"未达到稳定2秒：使用完整可识别人体帧":
+        "部分关键点缺失：低置信度参考评分";
+      const warning=mode==="stable"?
+        "已在约2秒的相对稳定片段中选择最佳评分帧；仍受单目视频误差影响。":
+        mode==="unstable"?
+        "未检测到符合连续保持条件的片段。本报告由真实可识别帧计算，稳定性证据不足，不能作为标准持姿成绩。":
+        "画面中存在缺失或遮挡的关键点。本报告仅为低置信度参考评估，建议全身入镜后重拍。";
+      const evaluatedResult:ScoreResult={
+        ...chosen.result,
+        videoQuality:{mode,label:statusLabel,warning,
+          sampledFrames:total,detectedFrames:detected,fullFrames:full,
+          partialFrames:partial,scoredFrames:scored,stableFrames:stable}
+      };
+      setResult(evaluatedResult);
+      setBestImage(chosen.photo);setBestOriginalImage(chosen.originalPhoto);setProgress(100);
+      setMessage("分析完成：" + statusLabel+"。可评分 "+scored+" 帧，最佳时刻 "+
+        (evaluatedResult.timeSec??0).toFixed(1)+" 秒。"+(mode==="stable"?"":" 结果已标注可靠性限制，可查看报告。"));
+    }catch(e){setMessage(e instanceof Error?e.message:String(e));}
     finally{
       detector?.close();if(element){element.removeAttribute("src");element.load();element.remove();}
       if(url)URL.revokeObjectURL(url);

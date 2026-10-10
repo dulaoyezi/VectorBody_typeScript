@@ -72,7 +72,7 @@ export class VideoHoldWindow {
     const cy=TRUNK_JOINTS.reduce((s,i)=>s+points[i].y,0)/TRUNK_JOINTS.length;
     const usable=HOLD_JOINTS.filter(i=>visible(points[i],0.30,0.03));
     const yValues=usable.map(i=>points[i].y);
-    const height=Math.max(0.20,...yValues)-Math.min(0,...yValues);
+    const height=Math.max(...yValues)-Math.min(...yValues);
     const joints=HOLD_JOINTS.map(i=>[points[i].x,points[i].y] as [number,number]);
     this.samples.push({t,cx,cy,height:Math.max(0.25,height),joints});
     this.samples=this.samples.filter(p=>p.t>=t-2.15);
