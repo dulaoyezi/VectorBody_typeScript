@@ -69,3 +69,13 @@ export function captureFrame(video:HTMLVideoElement,points:DetectedPoint[]|null)
   drawSkeleton(canvas,points,width,height,video);
   return canvas.toDataURL("image/jpeg",0.72);
 }
+
+/** Original photograph (without MediaPipe annotations) for the Python-style evidence report. */
+export function captureOriginalFrame(video:HTMLVideoElement) {
+  const width=Math.min(video.videoWidth||640,720);
+  const height=Math.round(width*(video.videoHeight||480)/(video.videoWidth||640));
+  const canvas=document.createElement("canvas");
+  canvas.width=width;canvas.height=height;
+  canvas.getContext("2d")?.drawImage(video,0,0,width,height);
+  return canvas.toDataURL("image/jpeg",0.82);
+}

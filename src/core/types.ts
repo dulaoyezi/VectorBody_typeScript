@@ -16,15 +16,16 @@ export interface ScoreResult {
   score: number; grade: "A" | "B" | "C" | "D"; riskPct: number; advice: string;
   dimensions: { s1: number; s2: number; s3: number };
   compensation: { mobileLockPct: number; stiffCompPct: number };
-  confidence: { ready: boolean; valid: boolean; qualityPct: number; maxDeviationPct: number; abnormalEdges: string[] };
-  topologyIK: { nodes: number; edges: number; iterations: number; initialResidual: number; finalResidual: number; maxLengthErrorPct: number };
+  confidence: { ready: boolean; valid: boolean; qualityPct: number; maxDeviationPct: number; abnormalEdges: string[]; referenceSamples?:number; learnReference?:boolean };
+  topologyIK: { nodes: number; edges: number; iterations: number; initialResidual: number; finalResidual: number; maxLengthErrorPct: number; meanBoneLength?:number };
   hold: { ready: boolean; phase: string; label: string; motionRatio: number; stability: number };
   metrics: Record<string, MetricScore>;
   landmarks: DetectedPoint[]; timeSec?: number; frameIndex?: number;
 }
 export interface SavedReport {
   id: string; createdAt: string; source: Source;
-  pose: PoseId; view: View; level: Level; result: ScoreResult; image?: string;
+  studentName: string; pose: PoseId; view: View; level: Level; result: ScoreResult;
+  image?: string; originalImage?: string;
 }
 export const POSES: { id: PoseId; name: string; description: string }[] = [
   { id: "warrior1", name: "战士一式", description: "前后步 · 稳定上举" },

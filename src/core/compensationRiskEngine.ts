@@ -200,10 +200,12 @@ export class VectorBodyEngine {
       dimensions:{s1:rounded(joint),s2:rounded(topology),s3:rounded(proxy)},
       compensation:{mobileLockPct:rounded(mobileRisk*100),stiffCompPct:rounded(stiffRisk*100)},
       confidence:{ready:bone.ready,valid:bone.valid,qualityPct:rounded(bone.quality*100),
-        maxDeviationPct:rounded(bone.maxDeviation*100),abnormalEdges:bone.abnormalEdges},
+        maxDeviationPct:rounded(bone.maxDeviation*100),abnormalEdges:bone.abnormalEdges,
+        referenceSamples:bone.referenceSamples,learnReference:bone.learnReference},
       topologyIK:{nodes:ik.detail.nodes,edges:ik.detail.edges,iterations:ik.detail.iterations,
         initialResidual:rounded(ik.detail.initialResidual,6),finalResidual:rounded(ik.detail.finalResidual,6),
-        maxLengthErrorPct:rounded(ik.detail.maxLengthError*100,3)},
+        maxLengthErrorPct:rounded(ik.detail.maxLengthError*100,3),
+        meanBoneLength:rounded(ik.detail.meanBoneLength,6)},
       hold:{ready:hold.ready,phase:hold.phase,label:hold.label,motionRatio:rounded(hold.motionRatio,4),stability:rounded(hold.stability,3)},
       metrics:scores,landmarks:points.map(p=>({...p})),timeSec,frameIndex
     };
