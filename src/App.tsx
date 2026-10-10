@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import PythonHero from "./components/PythonHero";
 import PythonHomeSections from "./components/PythonHomeSections";
 import AnatomyView, { buildFindings } from "./components/AnatomyView";
-import { inspectVideoFrame, VideoHoldWindow } from "./core/videoSelection";
+import { inspectVideoFrame, VideoHoldWindow, chooseVideoCandidate } from "./core/videoSelection";
 import ReportDocument from "./components/ReportDocument";
 import { centered, inView, VectorBodyEngine } from "./core/compensationRiskEngine";
 import { GUIDANCE, POSES, type DetectedPoint, type Level, type PoseId, type SavedReport, type ScoreResult, type Source, type View } from "./core/types";
@@ -24,6 +24,11 @@ function getName(pose: PoseId): string {
 function ScoreView({result}:{result:ScoreResult}) {
   const metrics=Object.values(result.metrics).sort((a,b)=>a.score-b.score);
   return <section className="score-report">
+    {result.videoQuality&&<div className={"video-quality-panel "+result.videoQuality.mode} role="status">
+      <div className="video-quality-heading"><strong>{result.videoQuality.mode==="stable"?"已识别稳定片段":result.videoQuality.mode==="unstable"?"非稳定片段 · 参考评分":"部分关键点 · 低置信度评分"}</strong>
+        <span>采样 {result.videoQuality.sampledFrames} 帧 · 可评分 {result.videoQuality.scoredFrames} 帧 · 稳定 {result.videoQuality.stableFrames} 帧</span></div>
+      <p>{result.videoQuality.warning}</p>
+    </div>}
     <div className="score-heading">
       <div className="score-ring" style={{background:"conic-gradient(#738b73 "+result.score+"%, #e7e9df 0)"}}>
         <div><strong>{Math.round(result.score)}</strong><small>综合评分</small></div>
@@ -252,7 +257,7 @@ export default function App() {
           await new Promise<void>(resolve=>setTimeout(resolve,0));
         }
       }
-      const chosen=bestStable??bestFull??bestPartial;
+      const chosen=chooseVideoCandidate(bestStable,bestFull,bestPartial);
       if(!chosen){
         throw new Error(
           "视频中未发现能够可靠计算的关键点：采样 "+total+" 帧、检测到人体 "+detected+

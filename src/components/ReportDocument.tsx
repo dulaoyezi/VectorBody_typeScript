@@ -37,6 +37,13 @@ export default function ReportDocument({report:r}:Props){
       <div><span>动作驱动</span><strong>{drive}驱动类</strong></div>
       <div><span>报告编号</span><strong>{r.id}</strong></div>
     </div>
+    {b.videoQuality&&<section className="pdf-video-quality">
+      <strong>视频分析可靠性：{b.videoQuality.label}</strong>
+      <p>{b.videoQuality.warning}</p>
+      <p>采样 {b.videoQuality.sampledFrames} 帧 · 检测到人体 {b.videoQuality.detectedFrames} 帧 ·
+        完整人体 {b.videoQuality.fullFrames} 帧 · 部分人体 {b.videoQuality.partialFrames} 帧 ·
+        实际评分 {b.videoQuality.scoredFrames} 帧 · 稳定片段评分 {b.videoQuality.stableFrames} 帧</p>
+    </section>}
     <section className="pdf-section">
       <h2>01 · 最佳评分帧 · 档案照片</h2>
       <div className="pdf-evidence-images">

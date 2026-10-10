@@ -93,3 +93,9 @@ export class VideoHoldWindow {
     return medianDrift<=0.18;
   }
 }
+
+
+/** Stable segment always outranks non-hold full-body, which outranks partial-body. */
+export function chooseVideoCandidate<T>(stable:T|null,full:T|null,partial:T|null):T|null{
+  return stable ?? full ?? partial;
+}

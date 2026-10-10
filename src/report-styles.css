@@ -118,3 +118,19 @@
   .python-credibility{margin-bottom:36px;padding:24px;flex-direction:column;align-items:start}
   .python-cred-badge{align-self:end}
 }
+
+
+/* Video upload fallback labels, intentionally persistent in archived and PDF reports */
+.video-quality-panel{padding:13px 15px;margin:0 0 22px;border-radius:11px;border:1px solid #dbe9d7;background:#f4f9f2}
+.video-quality-panel.unstable{background:#fff8ec;border-color:#eddbb9}
+.video-quality-panel.partial{background:#fff4f1;border-color:#e9cbc0}
+.video-quality-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.video-quality-heading strong{font-size:12px;color:#4a7452}
+.video-quality-panel.unstable .video-quality-heading strong{color:#996f2c}
+.video-quality-panel.partial .video-quality-heading strong{color:#ad6550}
+.video-quality-heading span{font-size:10px;color:#8b978c}
+.video-quality-panel p{font-size:11px;color:#718371;line-height:1.75;margin:7px 0 0}
+.pdf-video-quality{border:1px solid #decba7;background:#fffaf0;border-radius:8px;padding:10px 14px;margin:0 0 17px;break-inside:avoid}
+.pdf-video-quality strong{font-size:11px;color:#8a632e}
+.pdf-video-quality p{font-size:10px;line-height:1.7;color:#796c59;margin:6px 0}
+@media print{.pdf-video-quality{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
