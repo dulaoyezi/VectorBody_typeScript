@@ -75,7 +75,8 @@
 @page{size:A4;margin:11mm}
 @media print{
   html,body,#root{width:100%;margin:0;padding:0;background:#fff!important}
-  .app{display:none!important}
+  .app{display:block!important;min-height:0!important}
+  .site-header,.app>main,.app>.footer{display:none!important}
   .print-document-holder{display:block!important}
   .pdf-report{padding:0!important}
   .pdf-meta,.pdf-dimensions div,.pdf-advice,.pdf-metric-table th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
