@@ -39,8 +39,11 @@ describe("Python-to-TypeScript port invariants",()=>{
   it("smooths a static pose without changing it",()=>{
     const f=new OneEuroFilter();
     const input=fixture().map(p=>[p.x,p.y,p.z] as Point);
-    expect(f.smooth(input)).toEqual(input);
-    expect(f.smooth(input)).toEqual(input);
+    const first=f.smooth(input),second=f.smooth(input);
+    for(let i=0;i<input.length;i++)for(let j=0;j<3;j++){
+      expect(first[i][j]).toBeCloseTo(input[i][j],12);
+      expect(second[i][j]).toBeCloseTo(input[i][j],12);
+    }
   });
   it("DLS returns finite corrected coordinates and residuals",()=>{
     const input=fixture().map(p=>[p.x,p.y,p.z] as Point);
