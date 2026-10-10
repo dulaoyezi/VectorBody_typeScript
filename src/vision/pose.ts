@@ -5,7 +5,7 @@ const WASM = import.meta.env.VITE_MEDIAPIPE_WASM_URL ||
 const MODEL = import.meta.env.VITE_MEDIAPIPE_MODEL_URL ||
   "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
 export interface PoseDetector {
-  detect(video: HTMLVideoElement | ImageBitmap, milliseconds: number): DetectedPoint[] | null;
+  detect(video: HTMLVideoElement | ImageBitmap | HTMLCanvasElement, milliseconds: number): DetectedPoint[] | null;
   close(): void;
 }
 export async function createPoseDetector(): Promise<PoseDetector> {
