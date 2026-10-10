@@ -13,7 +13,7 @@ import { VectorBodyEngine, centered, inView } from "../core/compensationRiskEngi
 import { GUIDANCE, POSES, type DetectedPoint, type Level, type PoseId, type ScoreResult, type View, type SavedReport } from "../core/types";
 import { createPoseDetector, type PoseDetector } from "../vision/pose";
 import { listReports, saveReport, deleteReport } from "../utils/reports";
-import { buildFindings } from "./reportEvidence";
+import { buildFindings, type Finding } from "./reportEvidence";
 import { PYTHON_STABLE_CENTER_MOVE, PYTHON_STABLE_SECONDS,
   PYTHON_VIDEO_FRAME_STRIDE, PYTHON_VIDEO_MAX_PROCESSED, PYTHON_VIDEO_DEFAULT_FPS,
   PythonStableHold } from "./pythonParity";
@@ -35,7 +35,7 @@ export interface PythonResult {
   topology_ik:{nodes:number;edges:number;iterations:number;initial_residual:number;final_residual:number;max_length_error_pct:number};
   hold_phase:string;
   metrics:Record<string,{value:number;score:number;stability:number;weight:number}>;
-  issue_regions:Record<string,unknown>[];
+  issue_regions:Finding[];
   landmarks:[number,number,number][];
   frame_index?:number|null; time_sec?:number|null;
   media?:{original?:string;skeleton?:string};
@@ -95,7 +95,7 @@ function realScore(score:ScoreResult,display:[number,number,number][],frameIndex
   };
 }
 function snapshot(src:CanvasImageSource,width:number,height:number,
-  display:[number,number,number][]|null,withSkeleton:boolean,findings:Record<string,unknown>[]=[]):string{
+  display:[number,number,number][]|null,withSkeleton:boolean,findings:Finding[]=[]):string{
   const scale=Math.min(1,1280/Math.max(width,height)),w=Math.max(1,Math.round(width*scale)),h=Math.max(1,Math.round(height*scale));
   const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
   const ctx=canvas.getContext("2d");
