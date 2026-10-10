@@ -14,6 +14,7 @@ import { GUIDANCE, POSES, type DetectedPoint, type Level, type PoseId, type Scor
 import { createPoseDetector, type PoseDetector } from "../vision/pose";
 import { listReports, saveReport, deleteReport } from "../utils/reports";
 import { buildFindings, type Finding } from "./reportEvidence";
+import { inferVideoFps } from "./videoFps";
 import { PYTHON_STABLE_CENTER_MOVE, PYTHON_STABLE_SECONDS,
   PYTHON_VIDEO_FRAME_STRIDE, PYTHON_VIDEO_MAX_PROCESSED, PYTHON_VIDEO_DEFAULT_FPS,
   PythonStableHold } from "./pythonParity";
@@ -283,7 +284,7 @@ export async function browserApi(path:string,options:RequestInit={}):Promise<any
       const engine=new VectorBodyEngine(opts.level);
       // Python OpenCV: read every 2nd decoded frame, limit to 1800 processed.
       // Browser HTMLVideoElement doesn't expose exact source FPS: 30 is fallback.
-      const fps=PYTHON_VIDEO_DEFAULT_FPS,stride=PYTHON_VIDEO_FRAME_STRIDE,maxProcessed=PYTHON_VIDEO_MAX_PROCESSED;
+      const fps=await inferVideoFps(file),stride=PYTHON_VIDEO_FRAME_STRIDE,maxProcessed=PYTHON_VIDEO_MAX_PROCESSED;
       const totalFrames=Math.min(maxProcessed,Math.floor(video.duration*fps/stride));
       let processed=0,good=0,best:PythonResult|null=null,original:string|null=null,skeleton:string|null=null;
       const hold=new PythonStableHold();
