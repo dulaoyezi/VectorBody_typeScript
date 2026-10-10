@@ -1,0 +1,87 @@
+/* Original Python Web visual identity: warm ivory/olive/maple + its exact homepage SVG */
+.python-hero{min-height:526px;margin-top:26px;border-radius:31px;overflow:hidden;display:grid;grid-template-columns:1.12fr .88fr;background:linear-gradient(107deg,#f6f5eb 5%,#e9efdf 60%,#d8e3d3 100%);box-shadow:0 16px 48px rgba(38,59,45,.07);border:1px solid #e5e8dd}
+.python-hero-copy{padding:80px 0 58px 72px;position:relative;z-index:2}
+.python-eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:11px;color:#6b8661;letter-spacing:.16em;font-weight:750}
+.python-eyebrow i{width:7px;height:7px;background:#94a987;border-radius:50%}
+.python-hero h1{font:650 clamp(40px,4.35vw,68px)/1.26 "STSong","Noto Serif SC",Georgia,serif;color:#253a2a;letter-spacing:-.035em;margin:27px 0 24px}
+.python-hero h1 em{font-style:normal;color:#70825c}
+.python-hero-copy>p{line-height:1.9;font-size:15px;color:#6b766c;max-width:490px;margin:0 0 32px}
+.python-hero-buttons{display:flex;flex-wrap:wrap;gap:13px}.python-hero-buttons .primary{background:#657951;border-color:#657951;min-height:47px;padding:12px 19px;border-radius:13px}
+.python-hero-buttons .secondary{background:rgba(255,255,255,.7);border-color:#d8dcd2;min-height:47px;padding:12px 19px;border-radius:13px}
+.python-hero-foot{display:flex;flex-wrap:wrap;gap:23px;margin-top:34px;color:#7d8977;font-size:11px}.python-hero-foot span:before{content:'✓';margin-right:7px;color:#9ba989}
+.python-hero-visual{position:relative;min-height:470px;overflow:hidden}
+.python-sun{position:absolute;width:340px;height:340px;top:44px;left:10%;border-radius:50%;background:radial-gradient(circle,#f4e6ba 0%,#e8e2c5 43%,rgba(234,231,203,0) 70%)}
+.python-ground{position:absolute;left:8%;right:-10%;height:100px;bottom:-30px;background:#9eae90;filter:blur(32px);border-radius:100%}
+.python-yoga-figure{position:absolute;top:0;left:0;width:100%;height:100%}
+.python-float-note{position:absolute;display:flex;gap:12px;align-items:center;bottom:53px;left:0;background:rgba(255,254,250,.93);padding:13px 19px;border-radius:17px;box-shadow:0 9px 30px rgba(50,76,47,.09);border:1px solid #f6f4ee}
+.python-note-icon{background:#e9eedf;border-radius:13px;padding:9px;color:#5d7354;font-size:24px;line-height:1}
+.python-float-note strong{display:block;font-size:13px}.python-float-note small{display:block;margin-top:4px;color:#9a9e93;font-size:10px}
+.python-vertical-type{position:absolute;right:10px;bottom:45px;writing-mode:vertical-rl;letter-spacing:.27em;font-size:10px;color:#809279}
+
+/* Original Python Web archive anatomy interface, adapted for React */
+.anatomy-view{background:#fbfcf8;border:1px solid #e8eee3;border-radius:13px;padding:16px}
+.anatomy-switches{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:13px}
+.anatomy-switches>div{display:flex;gap:4px;background:#eef2ea;border-radius:9px;padding:3px}
+.anatomy-switches button{border:0;background:transparent;color:#869587;border-radius:7px;padding:7px 13px;font-size:11px}
+.anatomy-switches button.selected{background:#fff;color:#496b53;box-shadow:0 2px 6px #354d3c18;font-weight:700}
+.anatomy-columns{display:grid;grid-template-columns:minmax(160px,.85fr) minmax(170px,1fr);gap:14px}
+.anatomy-figure{margin:0;text-align:center;background:#eef2ed;border-radius:12px;padding:10px;min-width:0}
+.anatomy-image-shell{position:relative;width:100%;max-width:300px;margin:auto;aspect-ratio:3/4}
+.anatomy-image-shell img{display:block;width:100%;height:100%;object-fit:contain}
+.anatomy-pins{position:absolute;inset:0;pointer-events:none}.anatomy-pin{position:absolute;width:25px;height:25px;border-radius:50%;transform:translate(-50%,-50%);border:3px solid #caa35d;background:#d7b46a38;box-shadow:0 0 0 4px #e5c27d3d}.anatomy-pin.high{border-color:#cc6a5d;background:#e8857c33}.anatomy-pin.medium{border-color:#db9b63}
+.anatomy-figure figcaption{font-size:10px;color:#879689;margin-top:6px}
+.anatomy-findings h4{font-size:12px;color:#56725b;margin:0 0 10px}
+.finding-card{display:flex;gap:9px;align-items:start;background:#fff;border:1px solid #edf0ea;border-radius:9px;padding:9px;margin:0 0 8px}
+.finding-rank{border-radius:7px;padding:5px 6px;background:#f2e9d4;color:#9b792f;font-size:10px;font-weight:700}.finding-rank.high{background:#f8e0de;color:#bc5c51}.finding-rank.medium{background:#f8ecd9;color:#a66d39}
+.finding-card strong{display:block;color:#475f4d;font-size:11px;line-height:1.5}.finding-card p{font-size:10px;color:#778b7b;line-height:1.65;margin:5px 0}.finding-card small{font-size:9px;color:#a1afa2}
+.no-findings{font-size:11px;color:#7b937e;line-height:1.8}
+.anatomy-note{font-size:10px;color:#96a798;line-height:1.7;margin:12px 0 0}
+.anatomy-inline{margin-top:18px}.anatomy-inline summary{cursor:pointer;font-size:12px;color:#607961;padding:10px 0;font-weight:650}
+.studio-identity{display:flex;flex-direction:column;margin:18px 0 6px;gap:7px}
+.studio-identity span{font-size:11px;color:#849487;font-weight:650}
+.studio-identity input{border:1px solid #dbe6d9;border-radius:10px;background:#fafdF8;color:#344c39;padding:13px 12px;outline-color:#86a38a;width:100%;font-size:13px}
+.studio-identity small{color:#97a799;font-size:10px}
+.report-student{font-weight:650;color:#486b50;font-size:12px}
+.report-actions-inline{display:flex;gap:9px;flex-wrap:wrap}.report-actions-inline button{flex:1;min-width:130px}
+.archive-person{display:block;color:#486e51;font-size:12px;font-weight:700;line-height:1.3;margin-bottom:6px}
+
+/* Print-ready document with Python Web's report sections, optimized for A4 */
+.print-document-holder{display:none}
+.pdf-report{font-family:"Noto Sans SC","Microsoft YaHei","PingFang SC",sans-serif;color:#283e2f;background:white;font-size:11px;line-height:1.65;padding:8mm 3mm}
+.pdf-brand{display:flex;justify-content:space-between;gap:12px;font-size:9px;letter-spacing:1.3px;color:#798c76;border-bottom:2px solid #789278;padding-bottom:11px}
+.pdf-cover{display:flex;align-items:center;justify-content:space-between;gap:25px;padding:28px 0 20px}
+.pdf-kicker{font-size:9px;letter-spacing:2px;color:#789879}.pdf-cover h1{font-size:24px;color:#283f2e;margin:12px 0 6px}.pdf-cover p{color:#84998a;font-size:11px;margin:0}
+.pdf-grade{width:92px;height:92px;border:6px solid #c7d6bc;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}.pdf-grade strong{font-size:32px;line-height:1.2}.pdf-grade small{font-size:9px}
+.pdf-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:#f4f8f1;padding:14px;border-radius:9px;margin-bottom:18px}
+.pdf-meta div{display:flex;flex-direction:column;gap:4px;min-width:0}.pdf-meta span{color:#8b9d89;font-size:9px}.pdf-meta strong{font-weight:600;color:#455f4a;font-size:11px;overflow-wrap:anywhere}
+.pdf-section{margin:17px 0;break-inside:auto}.pdf-section h2{font-size:13px;border-left:3px solid #9fac8b;color:#344c39;padding-left:9px;margin:0 0 13px;break-after:avoid}
+.pdf-evidence-images{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.pdf-evidence-images figure{margin:0;border:1px solid #e3e8df;padding:5px;text-align:center;min-height:170px}
+.pdf-evidence-images img{width:100%;height:215px;object-fit:contain;display:block}
+.pdf-evidence-images figcaption{color:#7a8f7c;font-size:9px;margin-top:4px}
+.pdf-no-photo{display:grid;place-items:center;min-height:170px;background:#f6f7f3;border:1px dashed #d3dfd0;color:#92a392;font-size:11px}
+.pdf-caption{font-size:9px;color:#96a598;margin-top:8px}
+.pdf-dimensions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.pdf-dimensions div{background:#f3f7f0;padding:11px;border-radius:8px;break-inside:avoid}.pdf-dimensions span{display:block;font-size:10px;color:#819782}.pdf-dimensions strong{font-size:19px;color:#59785c}
+.pdf-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:13px}
+.pdf-stats div{border:1px solid #e5ebdf;padding:9px;border-radius:6px;break-inside:avoid}
+.pdf-stats span{display:block;color:#829686;font-size:9px}.pdf-stats strong{font-weight:650;color:#436448;font-size:11px}
+.pdf-report .anatomy-view{margin-top:9px}.pdf-report .anatomy-columns{grid-template-columns:180px 1fr}.pdf-report .anatomy-figure{max-width:190px}.pdf-report .anatomy-image-shell{max-height:225px}.pdf-report .finding-card{padding:5px;margin-bottom:4px}.pdf-report .finding-card p{font-size:9px;margin:3px 0}
+.pdf-report .anatomy-note{font-size:9px}.pdf-metric-table{width:100%;border-collapse:collapse;font-size:10px}.pdf-metric-table th{text-align:left;background:#e9f0e4;color:#4d6a52}.pdf-metric-table th,.pdf-metric-table td{padding:9px 8px;border:1px solid #dfe7da}.pdf-metric-table tr{break-inside:avoid}
+.pdf-advice{background:#f3f7f0;border-radius:9px;padding:15px;break-inside:avoid}.pdf-advice p{font-size:11px;color:#4e6752;margin:0}
+.pdf-disclaimer{border-top:1px solid #dee8da;margin-top:23px;padding:12px 0;font-size:9px;color:#718273;break-inside:avoid}.pdf-disclaimer p{margin:5px 0 7px}
+@media(max-width:900px){.python-hero{grid-template-columns:1fr 1fr}.python-hero-copy{padding:55px 0 45px 40px}.python-hero-visual{min-height:425px}.python-hero h1{font-size:42px}.python-float-note{left:10px;bottom:28px}}
+@media(max-width:750px){.python-hero{grid-template-columns:1fr;min-height:0}.python-hero-copy{padding:42px 27px 20px}.python-hero h1{font-size:39px}.python-hero-visual{min-height:320px}.python-yoga-figure{width:100%;height:100%}.python-float-note{left:8%;bottom:20px}.python-sun{width:285px;height:285px;left:18%;top:10px}.python-vertical-type{right:18px;bottom:25px}.anatomy-columns{grid-template-columns:minmax(100px,.85fr) minmax(160px,1fr)}.anatomy-figure{padding:4px}.anatomy-image-shell{aspect-ratio:3/4}}
+@media(max-width:440px){.python-hero-buttons{flex-direction:column}.python-hero-buttons button{width:100%}.anatomy-columns{grid-template-columns:1fr}.anatomy-figure{max-width:220px;margin:auto;width:100%}}
+@page{size:A4;margin:11mm}
+@media print{
+  html,body,#root{width:100%;margin:0;padding:0;background:#fff!important}
+  .app{display:none!important}
+  .print-document-holder{display:block!important}
+  .pdf-report{padding:0!important}
+  .pdf-meta,.pdf-dimensions div,.pdf-advice,.pdf-metric-table th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pdf-evidence-images{break-inside:avoid}
+  .pdf-report .anatomy-view{break-inside:avoid}
+  .pdf-report .anatomy-image-shell{max-height:205px}
+  .pdf-report .anatomy-note{font-size:8px}
+  .pdf-report .pdf-section{margin:12px 0}
+}
