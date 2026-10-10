@@ -34,6 +34,19 @@ describe("Python report structure",()=>{
     expect(rows.map(r=>r.key)).toEqual(["spine_vertical","shoulder_symmetry","pelvis_level","neck_axis"]);
     expect(rows[0].label).toBe("躯干垂直");
   });
+  it("includes explicit low-confidence evidence warning for no-hold scoring",()=>{
+    const report=sampleReport();
+    report.result.videoQuality={
+      mode:"unstable",label:"未达到稳定2秒：使用完整可识别人体帧",
+      warning:"未检测到符合连续保持条件的片段。本报告是参考评分，稳定性证据不足。",
+      sampledFrames:30,detectedFrames:26,fullFrames:21,partialFrames:3,
+      scoredFrames:24,stableFrames:0
+    };
+    const html=renderToStaticMarkup(createElement(ReportDocument,{report}));
+    for(const phrase of ["视频分析可靠性","未达到稳定2秒","稳定性证据不足",
+      "采样","30","实际评分","24","稳定片段评分","0"])
+      expect(html).toContain(phrase);
+  });
   it("marks low-score regions and HTML-escapes the subject name",()=>{
     const r=sampleReport();
     r.result.metrics.shoulder_symmetry.score=35;
