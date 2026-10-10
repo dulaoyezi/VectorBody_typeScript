@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import PythonHero from "./components/PythonHero";
+import AnatomyView from "./components/AnatomyView";
+import ReportDocument from "./components/ReportDocument";
 import { centered, inView, VectorBodyEngine } from "./core/compensationRiskEngine";
 import { GUIDANCE, POSES, type DetectedPoint, type Level, type PoseId, type SavedReport, type ScoreResult, type Source, type View } from "./core/types";
-import { captureFrame, createPoseDetector, drawSkeleton, type PoseDetector } from "./vision/pose";
+import { captureFrame, captureOriginalFrame, createPoseDetector, drawSkeleton, type PoseDetector } from "./vision/pose";
 import { deleteReport, downloadJson, listReports, saveReport } from "./utils/reports";
 
 type Tab = "home" | "live" | "video" | "reports";
@@ -10,7 +14,7 @@ interface LiveSession {
   stream: MediaStream; detector: PoseDetector; engine: VectorBodyEngine;
   raf: number; lastTick: number; stableFrom: number | null;
   lastCenter: [number,number] | null; wasHolding: boolean;
-  best: ScoreResult | null; bestPhoto: string | null; frames: number;
+  best: ScoreResult | null; bestPhoto: string | null; bestOriginalPhoto: string | null; frames: number;
 }
 function getName(pose: PoseId): string {
   return POSES.find(p=>p.id===pose)?.name??pose;
@@ -49,29 +53,20 @@ function ScoreView({result}:{result:ScoreResult}) {
     <p className="clinical-note">仅用于瑜伽教学动作反馈；S3 属于视觉代理指标，非真实肌肉力量或医学诊断。</p>
   </section>;
 }
-function IconFigure() {
-  return <svg viewBox="0 0 360 360" className="hero-figure" aria-hidden="true">
-    <circle cx="180" cy="180" r="154" fill="none" stroke="#c5d0b9" strokeWidth="1" strokeDasharray="4 7"/>
-    <circle cx="180" cy="180" r="113" fill="none" stroke="#d9d5bd" strokeWidth="1"/>
-    <circle cx="184" cy="74" r="22" fill="#c9d3bc"/>
-    <path d="M178 98 L164 145 L175 210 L148 292" fill="none" stroke="#718975" strokeWidth="15" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M182 103 L210 150 L221 201 L272 277" fill="none" stroke="#718975" strokeWidth="15" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M172 117 L113 160 L62 176 M190 116 L240 151 L301 166" stroke="#a88f62" strokeWidth="14" fill="none" strokeLinecap="round"/>
-    {[[184,74],[176,112],[164,145],[210,150],[175,210],[221,201],[148,292],[272,277],[113,160],[62,176],[240,151],[301,166]].map(([x,y],i)=>
-      <circle key={i} cx={x} cy={y} r="5.5" fill="#f5edce" stroke="#668b74" strokeWidth="2"/>)}
-    <text x="24" y="34" fill="#748475" fontSize="11" letterSpacing="2">33 LANDMARKS</text>
-    <text x="250" y="338" fill="#9f9275" fontSize="11">DLS · TOPOLOGY</text>
-  </svg>;
-}
 export default function App() {
   const [tab,setTab]=useState<Tab>("home");
   const [pose,setPose]=useState<PoseId>("warrior2");
   const [view,setView]=useState<View>("front");
   const [level,setLevel]=useState<Level>("normal");
+  const [liveStudentName,setLiveStudentName]=useState("");
+  const [videoStudentName,setVideoStudentName]=useState("");
+  const [resultStudentName,setResultStudentName]=useState("");
+  const [printReport,setPrintReport]=useState<SavedReport|null>(null);
   const [status,setStatus]=useState<Status>("idle");
   const [message,setMessage]=useState("选择体式，启动摄像头或上传练习视频。");
   const [result,setResult]=useState<ScoreResult|null>(null);
   const [bestImage,setBestImage]=useState<string|null>(null);
+  const [bestOriginalImage,setBestOriginalImage]=useState<string|null>(null);
   const [videoFile,setVideoFile]=useState<File|null>(null);
   const [progress,setProgress]=useState(0);
   const [reports,setReports]=useState<SavedReport[]>([]);
@@ -102,7 +97,7 @@ export default function App() {
     setTab(next);if(next==="reports")void readReports();
   }
   function resetForNew(){
-    setResult(null);setBestImage(null);setSaved(false);setProgress(0);
+    setResult(null);setBestImage(null);setBestOriginalImage(null);setSaved(false);setProgress(0);
   }
   function speak(text:string){
     if(!("speechSynthesis" in window))return;
@@ -114,7 +109,7 @@ export default function App() {
   async function startCamera(){
     if(live.current)return;
     if(!navigator.mediaDevices?.getUserMedia){setMessage("请使用 HTTPS 或 localhost，并允许浏览器使用摄像头。");return;}
-    resetForNew();setStatus("loading");setMessage("正在加载 MediaPipe 模型并请求摄像头权限…");
+    resetForNew();setResultStudentName(liveStudentName.trim());setStatus("loading");setMessage("正在加载 MediaPipe 模型并请求摄像头权限…");
     let detector:PoseDetector|null=null,stream:MediaStream|null=null;
     try {
       detector=await createPoseDetector();
@@ -124,7 +119,7 @@ export default function App() {
       video.srcObject=stream;await video.play();
       const opts=optionRef.current;
       const session:LiveSession={stream,detector,engine:new VectorBodyEngine(opts.level),raf:0,lastTick:0,
-        stableFrom:null,lastCenter:null,wasHolding:false,best:null,bestPhoto:null,frames:0};
+        stableFrom:null,lastCenter:null,wasHolding:false,best:null,bestPhoto:null,bestOriginalPhoto:null,frames:0};
       live.current=session;setStatus("running");
       setCurrentSource("live");
       setMessage("全身入镜并居中，保持约2秒后开始连续评分。");
@@ -160,7 +155,8 @@ export default function App() {
           setResult(scored);setMessage("正在检测 · 可随时调整动作重新评价");
           if(!session.best||scored.score>session.best.score){
             session.best=scored;session.bestPhoto=captureFrame(video,pts);
-            setBestImage(session.bestPhoto);setSaved(false);
+            session.bestOriginalPhoto=captureOriginalFrame(video);
+            setBestImage(session.bestPhoto);setBestOriginalImage(session.bestOriginalPhoto);setSaved(false);
           }
         }catch(e){setMessage("摄像头推理失败："+String(e));stopLiveInternal();setStatus("idle");}
       };
@@ -174,14 +170,15 @@ export default function App() {
     if(!live.current)return;
     const best=live.current.best;
     const photo=live.current.bestPhoto;
+    const originalPhoto=live.current.bestOriginalPhoto;
     stopLiveInternal();setStatus("idle");
-    if(best){setResult(best);setBestImage(photo);setMessage("实时检测已停止。可选择保存最佳评估记录。");}
+    if(best){setResult(best);setBestImage(photo);setBestOriginalImage(originalPhoto);setMessage("实时检测已停止。可选择保存最佳评估记录。");}
     else setMessage("实时检测已停止，尚未获取有效的稳定姿态。");
   }
 
   async function analyzeVideo(){
     if(!videoFile){setMessage("请先选择一个视频文件。");return;}
-    resetForNew();cancelVideo.current=false;setStatus("processing");setCurrentSource("video");
+    resetForNew();setResultStudentName(videoStudentName.trim());cancelVideo.current=false;setStatus("processing");setCurrentSource("video");
     setMessage("正在加载视频与 MediaPipe 模型…");
     let detector:PoseDetector|null=null,element:HTMLVideoElement|null=null,url:string|null=null;
     try {
@@ -201,7 +198,7 @@ export default function App() {
       const limit=Math.min(duration,120); // Demo safety cap; avoid locking client for huge uploads.
       const engine=new VectorBodyEngine(optionRef.current.level);
       let stableFrom:number|null=null,lastCenter:[number,number]|null=null;
-      let best:ScoreResult|null=null,bestPhoto:string|null=null,good=0;
+      let best:ScoreResult|null=null,bestPhoto:string|null=null,bestOriginalPhoto:string|null=null,good=0;
       let index=0;
       for(let t=0;t<limit;t+=0.20){
         if(cancelVideo.current)throw new Error("已取消视频分析");
@@ -224,7 +221,7 @@ export default function App() {
             if(scored){
               good++;
               if(!best||scored.score>best.score){
-                best=scored;bestPhoto=captureFrame(el,pts);
+                best=scored;bestPhoto=captureFrame(el,pts);bestOriginalPhoto=captureOriginalFrame(el);
               }
             }
           }
@@ -236,7 +233,7 @@ export default function App() {
         }
       }
       if(!best)throw new Error("未找到稳定2秒以上的有效姿态，请确认全身入镜、正侧位及视频画面清晰。");
-      setResult(best);setBestImage(bestPhoto);setProgress(100);
+      setResult(best);setBestImage(bestPhoto);setBestOriginalImage(bestOriginalPhoto);setProgress(100);
       setMessage("分析完成：有效评分帧 "+good+"；最佳时刻 "+(best.timeSec??0).toFixed(1)+" 秒。可以保存报告。");
     }catch(e){setMessage(String(e));}
     finally{
@@ -251,7 +248,9 @@ export default function App() {
     try{
       const report:SavedReport={
         id:crypto.randomUUID(),createdAt:new Date().toISOString(),source:currentSource,
-        pose,view,level,result,image:includeImage?(bestImage??undefined):undefined
+        studentName:resultStudentName,pose,view,level,result,
+        image:includeImage?(bestImage??undefined):undefined,
+        originalImage:includeImage?(bestOriginalImage??undefined):undefined
       };
       await saveReport(report);setSaved(true);setMessage("评估记录已保存到当前浏览器的 IndexedDB。");
       await readReports();
@@ -262,7 +261,30 @@ export default function App() {
     try{await deleteReport(id);if(selectedReport===id)setSelectedReport(null);await readReports();}
     catch(e){setMessage("删除失败："+String(e));}
   }
+  function printAsPdf(report:SavedReport) {
+    // Synchronously mount the complete report so printing works with React state.
+    flushSync(()=>setPrintReport(report));
+    const titleBefore=document.title;
+    const safeName=(report.studentName?.trim()||"未填写姓名").replace(/[<>:"/\\|?*\x00-\x1f]/g,"_");
+    document.title="智瑜镜_"+safeName+"_"+getName(report.pose)+"_动作评分报告";
+    const restore=()=>{document.title=titleBefore;};
+    window.addEventListener("afterprint",restore,{once:true});
+    const images=Array.from(document.querySelectorAll<HTMLImageElement>(".print-document-holder img"));
+    // Wait for evidence/anatomical images before Chrome/Edge saves a PDF.
+    void Promise.all(images.map(img=>img.complete?Promise.resolve():
+      (typeof img.decode==="function"?img.decode().catch(()=>{}):new Promise<void>(r=>{img.onload=()=>r();img.onerror=()=>r();}))))
+      .then(()=>window.print());
+  }
+  function printCurrentReport(){
+    if(!result)return;
+    printAsPdf({
+      id:crypto.randomUUID(),createdAt:new Date().toISOString(),source:currentSource,
+      studentName:resultStudentName,pose,view,level,result,
+      image:bestImage??undefined,originalImage:bestOriginalImage??undefined
+    });
+  }
   const selected=reports.find(r=>r.id===selectedReport);
+
   return <div className="app">
     <header className="site-header">
       <div className="brand" onClick={()=>navigate("home")} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==="Enter")navigate("home");}}>
@@ -277,19 +299,7 @@ export default function App() {
     </header>
     <main>
       {tab==="home"&&<div className="home">
-        <section className="hero">
-          <div className="hero-copy">
-            <div className="eyebrow"><span className="mini-dot"/> EXPLAINABLE MOTION INTELLIGENCE</div>
-            <h1>让每一次练习<br/><em>都有迹可循。</em></h1>
-            <p>可解释视觉 AI 驱动的大学瑜伽「教—学—练—评」一体化智能体。让姿态理解、代偿风险提示与个性化反馈，发生在你的浏览器里。</p>
-            <div className="hero-actions">
-              <button className="primary" onClick={()=>navigate("live")}>开启实时评估 <span>↗</span></button>
-              <button className="secondary" onClick={()=>navigate("video")}>上传动作视频 <span>→</span></button>
-            </div>
-            <div className="hero-footnote"><span className="online-dot"/> 完全浏览器端推理 · 不上传视频至业务服务器</div>
-          </div>
-          <div className="hero-visual"><div className="art-disc"/><IconFigure/><div className="floating-label a">33 <small>KEYPOINTS</small></div><div className="floating-label b">S1 · S2 · S3 <small>INTERPRETABLE</small></div></div>
-        </section>
+        <PythonHero onLive={()=>navigate("live")} onVideo={()=>navigate("video")}/>
         <section className="feature-grid">
           <div className="feature"><div className="feature-num">01 / PERCEPTION</div><div className="feature-icon">◎</div><h3>视觉姿态感知</h3><p>MediaPipe 提取人体 33 个关键点，实时可视化运动链与身体轴线。</p></div>
           <div className="feature"><div className="feature-num">02 / RECONSTRUCTION</div><div className="feature-icon">⌁</div><h3>拓扑与 DLS 优化</h3><p>骨盆根人体拓扑树、虚拟骨长约束与阻尼最小二乘姿态稳定。</p></div>
@@ -313,6 +323,13 @@ export default function App() {
               <label>难度等级<select value={level} disabled={status!=="idle"} onChange={e=>{setLevel(e.target.value as Level);resetForNew();}}>
                 <option value="normal">普通标准</option><option value="beginner">初学者</option></select></label>
             </div>
+            <label className="studio-identity"><span>受评者姓名 · {tab==="live"?"实时评估":"视频评估"}</span>
+              <input type="text" autoComplete="off" maxLength={32} disabled={status!=="idle"}
+                value={tab==="live"?liveStudentName:videoStudentName}
+                onChange={e=>tab==="live"?setLiveStudentName(e.target.value):setVideoStudentName(e.target.value)}
+                placeholder="请输入学生姓名或匿名代号"/>
+              <small>姓名将写入本次评估档案和 PDF 报告；建议使用已获得授权的姓名或匿名代号。</small>
+            </label>
             <div className="guidance"><span>动作提示</span><p>{GUIDANCE[pose]}</p></div>
             {tab==="live"?<>
               <div className="camera-stage">
@@ -346,10 +363,13 @@ export default function App() {
           </section>
           <section className="results card">
             <div className="card-top"><div><small>02 / EXPLAINABLE FEEDBACK</small><h3>动作质量报告</h3></div><span className="small-badge">S1 · S2 · S3</span></div>
-            {result?<><ScoreView result={result}/>
+            {result?<><div className="report-student">受评者：{resultStudentName||"未填写姓名"}</div>
+              <ScoreView result={result}/>
+              <details className="anatomy-inline"><summary>人体骨骼 / 肌肉 · 代偿风险部位</summary><AnatomyView result={result}/></details>
               <div className="archive-actions">
-                <label className="checkline"><input type="checkbox" checked={includeImage} onChange={e=>setIncludeImage(e.target.checked)}/>在当前浏览器中一同保存动作截图</label>
+                <label className="checkline"><input type="checkbox" checked={includeImage} onChange={e=>setIncludeImage(e.target.checked)}/>经受评者同意，在当前浏览器中保存原图与骨架标注图</label>
                 <button className="primary stretch" disabled={saved} onClick={()=>void archive()}>{saved?"本次已保存 ✓":"保存本次评估报告"}</button>
+                <button className="secondary stretch" onClick={printCurrentReport}>打印 / 保存 PDF 报告</button>
                 <button className="secondary stretch" onClick={()=>speak(result.advice)}>朗读纠正建议</button>
               </div></>:<div className="empty-result"><div>↗</div><h3>等待分析结果</h3>
                 <p>启用实时摄像头或上传视频后，这里会显示关节符合性、拓扑稳定性、视觉支撑代理及个性化反馈。</p>
@@ -364,16 +384,21 @@ export default function App() {
         {reports.length?<div className="archive-layout">
           <div className="card archive-list">{reports.map(r=><button key={r.id} className={"archive-item "+(selectedReport===r.id?"chosen":"")}
             onClick={()=>setSelectedReport(r.id)}>
-            <div><strong>{getName(r.pose)} <span>· {r.view==="front"?"正位":"侧位"}</span></strong>
+            <div><span className="archive-person">{r.studentName?.trim()||"未填写姓名"}</span><strong>{getName(r.pose)} <span>· {r.view==="front"?"正位":"侧位"}</span></strong>
               <small>{new Date(r.createdAt).toLocaleString("zh-CN")} · {r.source==="live"?"实时":"视频"}</small></div>
             <b>{Math.round(r.result.score)}<small>分</small></b></button>)}</div>
           <div className="card archive-detail">{selected?<><div className="archive-detail-head">
-            <div className="eyebrow">ARCHIVED ASSESSMENT</div><h3>{getName(selected.pose)}</h3>
+            <div className="eyebrow">ARCHIVED ASSESSMENT</div><h3>{selected.studentName?.trim()||"未填写姓名"} · {getName(selected.pose)}</h3>
             <span className="subtle">{selected.view==="front"?"正面":"侧面"} · {selected.level==="beginner"?"初学者":"普通"} · {new Date(selected.createdAt).toLocaleString("zh-CN")}</span></div>
-            {selected.image&&<img className="saved-photo" src={selected.image} alt="已保存的姿态评分照片"/>}
+            {selected.originalImage&&<img className="saved-photo" src={selected.originalImage} alt="已保存的最佳帧原始照片"/>}
+            {selected.image&&<img className="saved-photo" src={selected.image} alt="已保存的骨架标注照片"/>}
             <ScoreView result={selected.result}/>
-            <div className="archive-actions row-buttons"><button className="secondary" onClick={()=>downloadJson(selected)}>下载 JSON 数据</button>
-              <button className="secondary danger" onClick={()=>void remove(selected.id)}>删除记录</button></div></>:
+            <details className="anatomy-inline" open><summary>人体骨骼 / 肌肉 · 部位定位</summary><AnatomyView result={selected.result}/></details>
+            <div className="archive-actions row-buttons">
+              <button className="primary" onClick={()=>printAsPdf(selected)}>打印 / 保存 PDF</button>
+              <button className="secondary" onClick={()=>downloadJson(selected)}>下载 JSON 数据</button>
+              <button className="secondary danger" onClick={()=>void remove(selected.id)}>删除记录</button>
+            </div></>:
             <div className="empty-result"><div>▤</div><h3>选择一条评估记录</h3><p>查看完整分项报告、纠正建议，并下载数据。</p></div>}</div>
         </div>:<div className="card empty-archive"><div>▤</div><h2>这里尚无保存的评估</h2><p>完成一次实时检测或视频分析，然后选择“保存本次评估报告”。</p>
           <button className="primary" onClick={()=>navigate("live")}>去进行评估 ↗</button></div>}
@@ -381,5 +406,6 @@ export default function App() {
       </div>}
     </main>
     <footer className="footer"><div><strong>智瑜镜</strong><span>VECTORBODY 2.0</span></div><p>可解释视觉人工智能 · 教学辅助系统 · 非医疗诊断</p><span>© 2026 VectorBody Project</span></footer>
+    {printReport&&<div className="print-document-holder"><ReportDocument report={printReport}/></div>}
   </div>;
 }
