@@ -7,7 +7,7 @@ import "./styles.css";
   const $ = id => document.getElementById(id);
   const POSE_NAMES = {warrior1:'战士一式',warrior2:'战士二式',tadasana:'山式',sukhasana:'简易坐',uttanasana:'站立前屈式',cobra:'眼镜蛇式',balance:'平衡式',downward:'下犬式'};
   const LINKS = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[27,29],[28,30],[29,31],[30,32]];
-  const state = {page:'home',stream:null,session:null,running:false,busy:false,timer:null,lastPhase:'',lastSpeak:0,lastScore:null,lastLive:null,firstResultSpoken:false,lastVideo:null,lastReport:null,voice:true,videoFile:null};
+  const state = {page:'home',stream:null,session:null,running:false,busy:false,timer:null,lastPhase:'',lastSpeak:0,lastScore:null,lastLive:null,firstResultSpoken:false,lastVideo:null,lastReport:null,lastLiveReportId:null,voice:true,videoFile:null};
   const icon = id => `<svg><use href="#i-${id}"></use></svg>`;
   const esc = text => String(text ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   function notify(text){const t=$('toast');t.textContent=String(text);t.classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>t.classList.remove('show'),4200)}
@@ -83,19 +83,80 @@ import "./styles.css";
   async function startLive(){try{
     if(!navigator.mediaDevices?.getUserMedia){throw new Error('请通过HTTPS或localhost访问，并允许浏览器使用摄像头。')}
     const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:960},height:{ideal:720}},audio:false});state.stream=stream;$('live-player').srcObject=stream;await $('live-player').play();
-    const started=await api('/api/live/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pose:$('live-pose').value,view:$('live-view').value,level:$('live-level').value,student_name:$('live-student-name').value.trim()})});state.session=started.session_id;state.running=true;state.lastPhase='prepare';state.lastScore=null;state.lastLive=null;state.firstResultSpoken=false;state.lastSpeak=0;$('live-empty').hidden=true;$('live-empty').style.display='none';$('live-toggle').innerHTML=`${icon('check')}完成评估并存档`;$('live-hint').textContent=started.message;phaseUI('prepare');speech(started.voice,true);state.timer=setInterval(captureFrame,320);notify('摄像头已开启，动作稳定约2秒后自动开始评分。');
+    const started=await api('/api/live/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pose:$('live-pose').value,view:$('live-view').value,level:$('live-level').value,student_name:$('live-student-name').value.trim()})});state.session=started.session_id;state.running=true;state.lastPhase='prepare';state.lastScore=null;state.lastLive=null;state.lastLiveReportId=null;$('save-live-report').disabled=true;$('print-live-report').disabled=true;state.firstResultSpoken=false;state.lastSpeak=0;$('live-empty').hidden=true;$('live-empty').style.display='none';$('live-toggle').innerHTML=`${icon('check')}完成评估并存档`;$('live-hint').textContent=started.message;phaseUI('prepare');speech(started.voice,true);state.timer=setInterval(captureFrame,320);notify('摄像头已开启，动作稳定约2秒后自动开始评分。');
   }catch(e){notify(e.message);if(state.stream){state.stream.getTracks().forEach(t=>t.stop());state.stream=null}}}
   const grab=document.createElement('canvas');
   async function captureFrame(){if(!state.running||state.busy||!state.session)return;const video=$('live-player');if(!video.videoWidth)return;state.busy=true;try{grab.width=video.videoWidth;grab.height=video.videoHeight;grab.getContext('2d').drawImage(video,0,0,grab.width,grab.height);const blob=await new Promise(resolve=>grab.toBlob(resolve,'image/jpeg',.76));if(!blob)return;const form=new FormData();form.append('session_id',state.session);form.append('frame',blob,'camera.jpg');const data=await api('/api/live/frame',{method:'POST',body:form});$('live-hint').textContent=data.message;phaseUI(data.phase);drawSkeleton($('live-overlay'),video,data.landmarks);
     if(data.phase!==state.lastPhase){if(data.phase==='framing')speech('请确保全身入镜。');else if(data.phase==='centering')speech('请移动到检测区域中央。');else if(data.phase==='stabilizing')speech('请保持身体稳定。');else if(data.phase==='hold')speech(data.voice||'动作稳定，开始评估。',true);state.lastPhase=data.phase}
-    if(data.result){const result=data.result;state.lastLive=result;resultUI('live',result);const now=Date.now();if(!state.firstResultSpoken){state.firstResultSpoken=true;setTimeout(()=>{if(state.running)speech(result.advice,true)},1600)}if(result.grade==='D'&&now-state.lastSpeak>12000)speech('当前代偿风险较高，建议降低动作幅度。');else if(state.lastScore!==null&&Math.abs(result.score-state.lastScore)>=4&&now-state.lastSpeak>15000)speech(result.advice);state.lastScore=result.score}
+    if(data.result){const result=data.result;state.lastLive=result;resultUI('live',result);$('save-live-report').disabled=false;$('print-live-report').disabled=false;const now=Date.now();if(!state.firstResultSpoken){state.firstResultSpoken=true;setTimeout(()=>{if(state.running)speech(result.advice,true)},1600)}if(result.grade==='D'&&now-state.lastSpeak>12000)speech('当前代偿风险较高，建议降低动作幅度。');else if(state.lastScore!==null&&Math.abs(result.score-state.lastScore)>=4&&now-state.lastSpeak>15000)speech(result.advice);state.lastScore=result.score}
   }catch(e){notify(`实时评估暂时中断：${e.message}`);if(/会话失效/.test(e.message))stopLive(false)}finally{state.busy=false}}
-  async function stopLive(archive=true){if(!state.running&&!state.stream)return;state.running=false;clearInterval(state.timer);if(state.stream){state.stream.getTracks().forEach(t=>t.stop());state.stream=null}$('live-player').srcObject=null;$('live-empty').hidden=false;$('live-empty').style.display='flex';$('live-toggle').innerHTML=`${icon('play')}开启摄像头评估`;$('live-status').textContent='已结束';$('live-status').className='status-tag neutral';$('live-hint').textContent='本次实时评估已结束';if(window.speechSynthesis)window.speechSynthesis.cancel();if(state.session){const session=state.session;state.session=null;try{const form=new FormData();form.append('session_id',session);form.append('archive',String(archive));const data=await api('/api/live/stop',{method:'POST',body:form});if(data.report_id)notify('实时评估结束，最佳评分已归档，可进入“评估报告”查看。');else notify('评估已结束。本次没有有效保持评分。')}catch(e){notify('结束成功，但归档请求失败：'+e.message)}}}
+  async function stopLive(archive=true){if(!state.running&&!state.stream)return;state.running=false;clearInterval(state.timer);if(state.stream){state.stream.getTracks().forEach(t=>t.stop());state.stream=null}$('live-player').srcObject=null;$('live-empty').hidden=false;$('live-empty').style.display='flex';$('live-toggle').innerHTML=`${icon('play')}开启摄像头评估`;$('live-status').textContent='已结束';$('live-status').className='status-tag neutral';$('live-hint').textContent='本次实时评估已结束';if(window.speechSynthesis)window.speechSynthesis.cancel();if(state.session){const session=state.session;state.session=null;try{const form=new FormData();form.append('session_id',session);form.append('archive',String(archive));const data=await api('/api/live/stop',{method:'POST',body:form});if(data.report_id){state.lastLiveReportId=data.report_id;$('print-live-report').disabled=false;notify('实时评估已归档，可进入评估报告查看。')}else notify('评估已结束。本次没有有效保持评分。');$('save-live-report').disabled=true}catch(e){notify('结束成功，但归档请求失败：'+e.message)}}}
   $('live-toggle').addEventListener('click',()=>state.running?stopLive():startLive());
-  function acceptFile(file){if(!file)return;state.videoFile=file;$('upload-info').textContent=`${file.name} · ${(file.size/1024/1024).toFixed(1)} MB`;$('upload-badge').textContent='视频已选择';$('uploaded-stage').hidden=false;$('file-drop').style.display='none';const player=$('uploaded-player');if(player.src?.startsWith('blob:'))URL.revokeObjectURL(player.src);player.src=URL.createObjectURL(file);$('show-video-report').disabled=true}
+  $('save-live-report').addEventListener('click',async()=>{
+    if(!state.session||!state.lastLive){notify('请先完成有效评分，再保存报告。');return;}
+    const btn=$('save-live-report');btn.disabled=true;
+    try{
+      const form=new FormData();form.append('session_id',state.session);
+      const saved=await api('/api/live/save',{method:'POST',body:form});
+      state.lastLiveReportId=saved.report_id;
+      notify('报告已写入当前浏览器，并可在“评估报告”中查看。');
+    }catch(e){notify('报告保存失败：'+e.message);}
+    finally{btn.disabled=!state.running;}
+  });
+  $('print-live-report').addEventListener('click',async()=>{
+    try{
+      let data;
+      if(state.session){
+        const form=new FormData();form.append('session_id',state.session);
+        data=await api('/api/live/preview',{method:'POST',body:form});
+      }else if(state.lastLiveReportId){
+        data=await api('/api/reports/'+encodeURIComponent(state.lastLiveReportId));
+      }
+      if(!data){notify('没有可打印的有效评估，请先完成一次评分。');return;}
+      navigate('reports');renderReport(data);
+      await printReadyReport();
+    }catch(e){notify('无法打印评估报告：'+e.message);}
+  });
+  function acceptFile(file){if(!file)return;state.videoFile=file;state.lastVideo=null;$('save-video-report').disabled=true;$('print-video-report').disabled=true;$('upload-info').textContent=`${file.name} · ${(file.size/1024/1024).toFixed(1)} MB`;$('upload-badge').textContent='视频已选择';$('uploaded-stage').hidden=false;$('file-drop').style.display='none';const player=$('uploaded-player');if(player.src?.startsWith('blob:'))URL.revokeObjectURL(player.src);player.src=URL.createObjectURL(file);$('show-video-report').disabled=true}
   $('video-file').addEventListener('change',e=>acceptFile(e.target.files?.[0]));const zone=$('file-drop');zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag')});zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');acceptFile(e.dataTransfer?.files?.[0])});
-  $('analyze-video').addEventListener('click',async()=>{if(!state.videoFile){notify('请先选择待分析视频。');return}const btn=$('analyze-video');btn.disabled=true;btn.textContent='正在执行逐帧视觉分析…';try{const fd=new FormData();fd.append('file',state.videoFile);fd.append('pose',$('video-pose').value);fd.append('view',$('video-view').value);fd.append('level',$('video-level').value);fd.append('student_name',$('video-student-name').value.trim());const data=await api('/api/analyze-video',{method:'POST',body:fd,onProgress:p=>{const badge=$('upload-badge'),info=$('upload-info');if(p.phase==='decoding'){badge.textContent='正在解码';info.textContent='读取视频编码与画面中…'}else if(p.phase==='archiving'){badge.textContent='正在保存报告';info.textContent='有效评分 '+p.evaluated+' 帧 · 正在写入本地学习档案…'}else{badge.textContent='正在分析 '+(p.total?Math.round(100*p.processed/p.total):0)+'%';info.textContent='已处理 '+p.processed+' 帧 · 检测到人体 '+p.detected+' 帧 · 全身可见 '+p.inView+' 帧 · 居中 '+p.centered+' 帧 · 稳定 '+p.stable+' 帧 · 评分 '+p.evaluated+' 帧';}}});state.lastVideo=data;resultUI('video',data.result);$('best-time').textContent=`${data.video.best_time_sec}s`;$('valid-frames').textContent=data.video.evaluated_frames;$('show-video-report').disabled=false;$('video-risk').textContent=`${Math.round(data.result.risk_pct)}%`;const player=$('uploaded-player');player.currentTime=data.video.best_time_sec;player.addEventListener('seeked',()=>drawSkeleton($('uploaded-overlay'),player,data.result.landmarks),{once:true});$('upload-badge').textContent='分析完成';$('upload-info').textContent='评估报告已自动归档 · '+data.video.evaluated_frames+' 帧有效评分 · 最佳时刻 '+data.video.best_time_sec+' 秒';notify('已使用VectorBody核心算法完成视频评估并归档。')}catch(e){$('upload-badge').textContent='分析未完成';$('upload-info').textContent='分析未完成：'+e.message;notify('分析未完成：'+e.message)}finally{btn.disabled=false;btn.innerHTML=`${icon('activity')}开始视频分析`}});
-  $('show-video-report').addEventListener('click',async()=>{navigate('reports');if(state.lastVideo?.report_id)await openReport(state.lastVideo.report_id)});
+  $('analyze-video').addEventListener('click',async()=>{if(!state.videoFile){notify('请先选择待分析视频。');return}const btn=$('analyze-video');btn.disabled=true;btn.textContent='正在执行逐帧视觉分析…';try{const fd=new FormData();fd.append('file',state.videoFile);fd.append('pose',$('video-pose').value);fd.append('view',$('video-view').value);fd.append('level',$('video-level').value);fd.append('student_name',$('video-student-name').value.trim());const data=await api('/api/analyze-video',{method:'POST',body:fd,onProgress:p=>{const badge=$('upload-badge'),info=$('upload-info');if(p.phase==='decoding'){badge.textContent='正在解码';info.textContent='读取视频编码与画面中…'}else if(p.phase==='archiving'){badge.textContent='正在保存报告';info.textContent='有效评分 '+p.evaluated+' 帧 · 正在写入本地学习档案…'}else{badge.textContent='正在分析 '+(p.total?Math.round(100*p.processed/p.total):0)+'%';info.textContent='已处理 '+p.processed+' 帧 · 检测到人体 '+p.detected+' 帧 · 全身可见 '+p.inView+' 帧 · 居中 '+p.centered+' 帧 · 稳定 '+p.stable+' 帧 · 评分 '+p.evaluated+' 帧';}}});state.lastVideo=data;resultUI('video',data.result);$('best-time').textContent=`${data.video.best_time_sec}s`;$('valid-frames').textContent=data.video.evaluated_frames;$('show-video-report').disabled=false;$('save-video-report').disabled=!data.draft_id;$('print-video-report').disabled=false;$('video-risk').textContent=`${Math.round(data.result.risk_pct)}%`;const player=$('uploaded-player');player.addEventListener('seeked',()=>drawSkeleton($('uploaded-overlay'),player,data.result.landmarks),{once:true});player.currentTime=data.video.best_time_sec;if(data.report_id){$('upload-badge').textContent='已保存报告';$('upload-info').textContent='报告已归档 · '+data.video.evaluated_frames+' 帧有效评分 · 最佳时刻 '+data.video.best_time_sec+' 秒';notify('分析完成，报告已保存到当前浏览器。')}else{$('upload-badge').textContent='评分完成 · 待保存';$('upload-info').textContent='评分已完成，但报告保存失败：'+(data.archive_error||'未知存储错误')+'。可点击“保存本次评估报告”重试，也可直接打印。';notify('评分成功，但报告尚未保存。请重试或先打印为 PDF。')}}catch(e){$('upload-badge').textContent='分析未完成';$('upload-info').textContent='分析未完成：'+e.message;notify('分析未完成：'+e.message)}finally{btn.disabled=false;btn.innerHTML=`${icon('activity')}开始视频分析`}});
+  $('save-video-report').addEventListener('click',async()=>{
+    const draftId=state.lastVideo?.draft_id;
+    if(!draftId){notify('没有待保存的视频评估，请先完成视频分析。');return;}
+    const btn=$('save-video-report');btn.disabled=true;
+    try{
+      const form=new FormData();form.append('draft_id',draftId);
+      const saved=await api('/api/video/save',{method:'POST',body:form});
+      state.lastVideo.report_id=saved.report_id;state.lastVideo.archive_error=null;
+      $('upload-badge').textContent='已保存报告';
+      $('upload-info').textContent='评分及原图、骨架图已保存至当前浏览器，可在评估报告中查看。';
+      notify('报告保存成功，已通过档案读回校验。');
+    }catch(e){
+      $('upload-badge').textContent='评分完成 · 待保存';
+      $('upload-info').textContent='保存失败：'+e.message+'。仍可查看临时报告并打印 PDF。';
+      notify('报告保存失败：'+e.message);
+    }finally{btn.disabled=false;}
+  });
+  async function showVideoReport(){
+    const data=state.lastVideo;
+    if(!data?.result){notify('请先完成视频分析。');return false;}
+    try{
+      let report=null;
+      if(data.report_id){
+        try{report=await api('/api/reports/'+encodeURIComponent(data.report_id));}
+        catch(e){console.warn('Saved report unavailable; trying temporary copy',e);}
+      }
+      if(!report&&data.draft_id)
+        report=await api('/api/video/draft/'+encodeURIComponent(data.draft_id));
+      if(!report)throw new Error('未找到可读取的评估报告。');
+      navigate('reports');renderReport(report);
+      return true;
+    }catch(e){notify('无法打开报告：'+e.message);return false;}
+  }
+  $('show-video-report').addEventListener('click',showVideoReport);
+  $('print-video-report').addEventListener('click',async()=>{
+    if(await showVideoReport())await printReadyReport();
+  });
   async function loadReports(){
     const box=$('reports-list');box.innerHTML='<div class="empty-message">正在加载记录…</div>';
     try{
@@ -109,9 +170,8 @@ import "./styles.css";
     }catch(e){box.innerHTML=`<div class="empty-message">加载失败：${esc(e.message)}</div>`}
   }
   $('refresh-reports').addEventListener('click',loadReports);
-  async function openReport(id){
-    try{
-      const data=await api('/api/reports/'+encodeURIComponent(id));state.lastReport=data;const r=data.body;
+  function renderReport(data){
+      state.lastReport=data;const r=data.body;
       const rows=Object.entries(r.metrics||{}).map(([key,item])=>`<tr><td>${esc(key)}</td><td>${esc(item.value)}</td><td>${esc(item.score)}</td><td>${esc(item.stability)}</td><td>${esc(item.weight)}</td></tr>`).join('');
       const meta=`受评者 ${esc(data.student_name||'未填写姓名')} · ${esc(new Date(data.created_at).toLocaleString())} · ${data.view==='front'?'正位采集':'侧位采集'} · ${data.level==='beginner'?'新手':'普通'} · ${esc(data.id)}`;
       $('report-content').innerHTML=`<div class="detail-body">
@@ -127,13 +187,42 @@ import "./styles.css";
         <p class="detail-advice"><b>可解释纠正与反馈：</b>${esc(r.advice||'暂无')}<br>总体代偿风险：${esc(r.risk_pct)}%　· 等级：${esc(r.grade)}</p>
         <details class="tech-details" open><summary>结构优化与骨长依据 ${icon('chevron')}</summary><div>${tech(r)}</div></details>
         <h4 class="report-subheading">分项指标与评分依据</h4><div class="report-table-wrap"><table class="metric-table"><thead><tr><th>指标</th><th>观测值</th><th>评分</th><th>稳定性</th><th>权重</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <p class="subtle-caption report-privacy">照片是个人运动影像，保存在当前服务器，应经授权访问和管理。系统仅用于动作学习与教学辅助，不用于医疗诊断；切换正面或背面解剖图不代表额外采集了对应视角。</p>
+        <p class="subtle-caption report-privacy">照片是个人运动影像，仅保存在当前浏览器，应经授权使用；不同设备和教师端不会自动同步。系统仅用于动作学习与教学辅助，不用于医疗诊断；切换正面或背面解剖图不代表额外采集了对应视角。</p>
       </div>`;
       $('report-detail').hidden=false;syncAnatomy($('report-content').querySelector('.anatomy-widget'));setReportPhoto('original');
       $('report-detail').scrollIntoView({behavior:'smooth',block:'start'});
-    }catch(e){notify('无法打开报告：'+e.message)}
+      return true;
   }
-  $('print-report').addEventListener('click',()=>window.print());
+  async function openReport(id){
+    try{
+      const data=await api('/api/reports/'+encodeURIComponent(id));
+      return renderReport(data);
+    }catch(e){notify('无法打开报告：'+e.message);return false;}
+  }
+  async function printReadyReport(){
+    const panel=$('report-detail');
+    if(!state.lastReport||panel.hidden||!panel.querySelector('.detail-body')){
+      notify('尚未打开有效报告，请先查看完整报告。');
+      return;
+    }
+    panel.querySelectorAll('details').forEach(d=>{d.open=true;});
+    const images=[...panel.querySelectorAll('img')].filter(img=>!img.hidden&&img.getAttribute('src'));
+    await Promise.all(images.map(img=>{
+      img.loading='eager';
+      if(img.complete)return Promise.resolve();
+      return new Promise(resolve=>{
+        const settle=()=>{clearTimeout(timer);resolve();};
+        const timer=setTimeout(settle,4000);
+        img.addEventListener('load',settle,{once:true});
+        img.addEventListener('error',settle,{once:true});
+      });
+    }));
+    if(document.fonts?.ready)await Promise.race([document.fonts.ready,
+      new Promise(resolve=>setTimeout(resolve,2000))]);
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    window.print();
+  }
+  $('print-report').addEventListener('click',()=>{void printReadyReport();});
   window.addEventListener('beforeunload',()=>{if(state.stream)state.stream.getTracks().forEach(t=>t.stop())});
   window.addEventListener('resize',()=>{if(state.running&&state.lastLive)drawSkeleton($('live-overlay'),$('live-player'),state.lastLive.landmarks)});
   health();navigate((location.hash||'#home').slice(1));
