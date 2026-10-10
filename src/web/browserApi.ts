@@ -27,7 +27,7 @@ interface Live {
   phase: "prepare" | "hold"; lastCenter: [number,number] | null;
   stableSince: number | null; readyAt: number | null;
   best: PythonResult|null; bestOriginal:string|null; bestSkeleton:string|null;
-  frameIndex: number; lastSeen: number;
+  frameIndex: number; lastSeen: number; archivedId: string|null;
 }
 export interface PythonResult {
   score:number; grade:string; risk_pct:number; advice:string;
@@ -44,6 +44,13 @@ export interface PythonResult {
   student_name?:string;
 }
 const sessionMap=new Map<string,Live>();
+interface VideoDraft {
+  id:string; createdAt:string; opts:Options; result:PythonResult;
+  original:string|null; skeleton:string|null; archivedId:string|null;
+}
+// Only the latest video assessment is retained in memory for retry/printing.
+// No score is inferred from an unsuccessful or unstable clip.
+let pendingVideo:VideoDraft|null=null;
 const MAX_SESSION=4,SESSION_TTL_MS=20*60_000;
 const allowedVideos=new Set(["mp4","mov","avi","mkv","m4v","webm"]);
 const names:Record<string,string>=Object.fromEntries(POSES.map(p=>[p.id,p.name]));
@@ -134,8 +141,8 @@ function generateId():string{
   return crypto.randomUUID().replace(/-/g,"");
 }
 async function archive(opts:Options,source:"live"|"video",result:PythonResult,
-  original:string|null,skeleton:string|null):Promise<string>{
-  const id=generateId().slice(0,12);
+  original:string|null,skeleton:string|null,existingId:string|null=null):Promise<string>{
+  const id=existingId??generateId().slice(0,12);
   const when=new Date().toISOString();
   // Retain original TS datatypes and Python-compatible report format in "body".
   const r:SavedReport={
@@ -199,7 +206,7 @@ export async function browserApi(path:string,options:BrowserRequest={}):Promise<
     const id=generateId(),opts:Options={pose,view:view as View,level:level as Level,studentName:nameValue(raw.student_name)};
     sessionMap.set(id,{opts,detector,engine:new VectorBodyEngine(opts.level),phase:"prepare",
       stableSince:null,lastCenter:null,readyAt:null,best:null,bestOriginal:null,bestSkeleton:null,
-      frameIndex:0,lastSeen:performance.now()});
+      frameIndex:0,lastSeen:performance.now(),archivedId:null});
     return {session_id:id,phase:"prepare",voice:GUIDANCE[opts.pose],message:"请按语音引导进入动作，确保全身入镜。"};
   }
   if(path==="/api/live/frame"&&method==="POST"){
@@ -253,6 +260,24 @@ export async function browserApi(path:string,options:BrowserRequest={}):Promise<
       return {...result,phase:"hold",message:"正在检测 · 调整后继续保持即可重新评价",best:session.best};
     }finally{image.close()}
   }
+  if((path==="/api/live/save"||path==="/api/live/preview")&&method==="POST"){
+    const fd=options.body;
+    if(!(fd instanceof FormData))throw new Error("报告参数无效。");
+    const session=sessionMap.get(textVal(fd.get("session_id")));
+    if(!session)throw new Error("实时评估会话已结束，请在结束前保存。");
+    if(!session.best)throw new Error("尚未获得符合原版稳定保持规则的有效评分，不能保存报告。");
+    if(path==="/api/live/preview"){
+      return {id:session.archivedId??"temp-live",source:"live",created_at:new Date().toISOString(),
+        pose:session.opts.pose,view:session.opts.view,level:session.opts.level,
+        student_name:session.opts.studentName,score:session.best.score,grade:session.best.grade,
+        body:{...session.best,media:{original:session.bestOriginal??undefined,
+          skeleton:session.bestSkeleton??undefined}}};
+    }
+    const reportId=await archive(session.opts,"live",session.best,
+      session.bestOriginal,session.bestSkeleton,session.archivedId);
+    session.archivedId=reportId;
+    return {ok:true,archived:true,report_id:reportId};
+  }
   if(path==="/api/live/stop"&&method==="POST"){
     const fd=options.body;
     if(!(fd instanceof FormData))throw new Error("停止评估参数无效。");
@@ -260,8 +285,31 @@ export async function browserApi(path:string,options:BrowserRequest={}):Promise<
     if(!s)return {ok:true,archived:false};
     sessionMap.delete(id);s.detector.close();
     const wantsArchive=textVal(fd.get("archive"))!=="false";
-    const reportId=wantsArchive&&s.best?await archive(s.opts,"live",s.best,s.bestOriginal,s.bestSkeleton):null;
+    const reportId=wantsArchive&&s.best
+      ?await archive(s.opts,"live",s.best,s.bestOriginal,s.bestSkeleton,s.archivedId)
+      :s.archivedId;
     return {ok:true,archived:!!reportId,report_id:reportId,best:s.best};
+  }
+  if(path==="/api/video/save"&&method==="POST"){
+    const fd=options.body;
+    if(!(fd instanceof FormData))throw new Error("视频归档参数无效。");
+    const draft=pendingVideo;
+    if(!draft||draft.id!==textVal(fd.get("draft_id")))
+      throw new Error("临时评分已过期，请重新分析该视频。");
+    const reportId=await archive(draft.opts,"video",draft.result,
+      draft.original,draft.skeleton,draft.archivedId);
+    draft.archivedId=reportId;
+    return {ok:true,report_id:reportId};
+  }
+  if(/^\/api\/video\/draft\/[^/]+$/.test(path)&&method==="GET"){
+    const draft=pendingVideo;
+    if(!draft||path.split("/").pop()!==draft.id)
+      throw new Error("临时评估已过期，请重新分析该视频。");
+    return {id:draft.archivedId??draft.id,source:"video",created_at:draft.createdAt,
+      pose:draft.opts.pose,view:draft.opts.view,level:draft.opts.level,
+      student_name:draft.opts.studentName,score:draft.result.score,grade:draft.result.grade,
+      body:{...draft.result,media:{original:draft.original??undefined,
+        skeleton:draft.skeleton??undefined}}};
   }
   if(path==="/api/analyze-video"&&method==="POST"){
     const fd=options.body;
@@ -276,6 +324,7 @@ export async function browserApi(path:string,options:BrowserRequest={}):Promise<
     if(!allowedVideos.has(suffix))throw new Error("视频格式不支持，请选择MP4、MOV、AVI、MKV或WebM。");
     if(file.size>120*1024*1024)throw new Error("文件不能超过120MB。");
     const opts:Options={pose,view:view as View,level:level as Level,studentName:nameValue(fd.get("student_name"))};
+    pendingVideo=null;
     emitProgress(options,"decoding",new PythonVideoEvaluator().stats,0,0);
     const decoder=await BrowserVideoDecoder.open(file);
     let model:PoseDetector|null=null;
@@ -318,8 +367,17 @@ export async function browserApi(path:string,options:BrowserRequest={}):Promise<
       emitProgress(options,"analyzing",evaluation.stats,totalFrames,decoder.duration);
       if(!best)throw new Error(videoFailureReason(evaluation.stats));
       emitProgress(options,"archiving",evaluation.stats,totalFrames,best.time_sec??decoder.duration);
-      const reportId=await archive(opts,"video",best,original,skeleton);
-      return {ok:true,report_id:reportId,
+      // Persistence failures must not erase a genuinely computed score.
+      // Keep its actual evidence in memory so the user can retry or print.
+      const draft:VideoDraft={id:generateId().slice(0,12),createdAt:new Date().toISOString(),
+        opts,result:best,original,skeleton,archivedId:null};
+      pendingVideo=draft;
+      let reportId:string|null=null,archiveError:string|null=null;
+      try{
+        reportId=await archive(opts,"video",best,original,skeleton);
+        draft.archivedId=reportId;
+      }catch(e){archiveError=e instanceof Error?e.message:String(e);}
+      return {ok:true,report_id:reportId,draft_id:draft.id,archive_error:archiveError,
         pose:{id:opts.pose,name:names[opts.pose],view:opts.view,level:opts.level},
         result:best,video:{
           processed_frames:evaluation.stats.processed,
@@ -341,7 +399,7 @@ export async function browserApi(path:string,options:BrowserRequest={}):Promise<
   }
   if(/^\/api\/reports\/[^/]+$/.test(path)){
     const id=idParam(path);
-    const r=(await listReports()).find(x=>x.id===id);
+    const r=await readReport(id);
     if(method==="DELETE"){if(r)await deleteReport(id);return {ok:!!r}}
     if(!r)throw new Error("记录不存在");
     return {id:r.id,created_at:r.createdAt,source:r.source,pose:r.pose,view:r.view,
