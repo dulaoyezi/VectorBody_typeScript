@@ -54,6 +54,15 @@ describe("Python video analysis diagnostic gate",()=>{
     expect(center.inspect(.1,shift,960,720).stage).toBe("off_center");
     expect(videoFailureReason(center.stats)).toContain("画面中心");
   });
+  it("explains failed scoring after the 2-second stable gate",()=>{
+    const e=new PythonVideoEvaluator();
+    for(let frame=2;frame<=120;frame+=2){
+      const a=e.inspect(frame/30,pose(),960,720);
+      if(a.stage==="ready")e.evaluated(false);
+    }
+    expect(e.stats.stable).toBeGreaterThan(0);
+    expect(videoFailureReason(e.stats)).toContain("评分未满足");
+  });
   it("never grades an unsteady but detectable video",()=>{
     const e=new PythonVideoEvaluator();
     for(let frame=2;frame<=100;frame+=2){
@@ -78,6 +87,13 @@ class FakeVideo extends EventTarget {
   }
 }
 describe("decoded frame readiness",()=>{
+  it("does not wait for a seeked event when current timestamp already matches",async()=>{
+    const fake=new FakeVideo();
+    fake.readyState=0;
+    const promise=seekDecodedVideo(fake as unknown as HTMLVideoElement,0,1000);
+    queueMicrotask(()=>{fake.readyState=2;fake.dispatchEvent(new Event("loadeddata"));});
+    await expect(promise).resolves.toBeUndefined();
+  });
   it("waits for seeking to complete before returning",async()=>{
     const fake=new FakeVideo();
     await seekDecodedVideo(fake as unknown as HTMLVideoElement,2.5);
