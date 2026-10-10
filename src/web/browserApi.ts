@@ -15,9 +15,10 @@ import { createPoseDetector, type PoseDetector } from "../vision/pose";
 import { listReports, saveReport, deleteReport } from "../utils/reports";
 import { buildFindings, type Finding } from "./reportEvidence";
 import { inferVideoFps } from "./videoFps";
+import { BrowserVideoDecoder } from "./videoDecoder";
+import { PythonVideoEvaluator, videoFailureReason, type VideoDiagnostics } from "./videoEvaluator";
 import { PYTHON_STABLE_CENTER_MOVE, PYTHON_STABLE_SECONDS,
-  PYTHON_VIDEO_FRAME_STRIDE, PYTHON_VIDEO_MAX_PROCESSED,
-  PythonStableHold } from "./pythonParity";
+  PYTHON_VIDEO_FRAME_STRIDE, PYTHON_VIDEO_MAX_PROCESSED } from "./pythonParity";
 import { rounded } from "../core/math";
 
 interface Options { pose: PoseId; view: View; level: Level; studentName: string }
@@ -157,31 +158,20 @@ function idParam(url:string):string{
   const part=url.split("/").filter(Boolean)[2];
   return decodeURIComponent(part??"");
 }
-async function videoMetadata(video:HTMLVideoElement):Promise<void>{
-  video.muted=true;video.preload="auto";video.playsInline=true;
-  await new Promise<void>((resolve,reject)=>{
-    if(video.readyState>=2 && Number.isFinite(video.duration))return resolve();
-    const timeout=setTimeout(()=>{cleanup();reject(new Error("视频解码超时。"))},18000);
-    const onData=()=>{cleanup();resolve();};
-    const onError=()=>{cleanup();reject(new Error("视频无法解码，建议转成H.264编码的MP4。"));};
-    const cleanup=()=>{clearTimeout(timeout);video.removeEventListener("loadeddata",onData);video.removeEventListener("error",onError);};
-    video.addEventListener("loadeddata",onData);video.addEventListener("error",onError);video.load();
-  });
+export interface VideoProgress extends VideoDiagnostics {
+  total:number;timeSec:number;phase:"decoding"|"analyzing"|"archiving";
 }
-async function seek(video:HTMLVideoElement,time:number):Promise<void>{
-  if(Math.abs(video.currentTime-time)<0.0008 && video.readyState>=2)return;
-  await new Promise<void>((resolve,reject)=>{
-    const t=setTimeout(()=>{end();reject(new Error("浏览器视频逐帧解码超时。"))},12000);
-    const done=()=>{end();resolve();};
-    const err=()=>{end();reject(new Error("浏览器无法定位视频帧。"))};
-    const end=()=>{clearTimeout(t);video.removeEventListener("seeked",done);video.removeEventListener("error",err);};
-    video.addEventListener("seeked",done);video.addEventListener("error",err);
-    video.currentTime=time;
-  });
+export interface BrowserRequest extends RequestInit {
+  onProgress?:(progress:VideoProgress)=>void;
+}
+function emitProgress(options:BrowserRequest,phase:VideoProgress["phase"],
+  stats:VideoDiagnostics,total:number,timeSec:number):void {
+  try{ options.onProgress?.({...stats,total,timeSec,phase}); }
+  catch(error){console.warn("Unable to display video progress",error);}
 }
 
 /** Python Web API equivalent, without a remote Python server. */
-export async function browserApi(path:string,options:RequestInit={}):Promise<any>{
+export async function browserApi(path:string,options:BrowserRequest={}):Promise<any>{
   const method=(options.method??"GET").toUpperCase();
   if(path==="/api/health")return {ok:true,engine:"VectorBody_v2",version:"1.0.0"};
   if(path==="/api/poses")return {poses:POSES.map(({id,name})=>({id,name})),views:["front","side"],levels:["normal","beginner"]};
@@ -263,7 +253,9 @@ export async function browserApi(path:string,options:RequestInit={}):Promise<any
   if(path==="/api/analyze-video"&&method==="POST"){
     const fd=options.body;
     if(!(fd instanceof FormData))throw new Error("视频参数无效。");
-    const pose=textVal(fd.get("pose"))||"warrior2",view=textVal(fd.get("view"))||"front",level=textVal(fd.get("level"))||"normal";
+    const pose=textVal(fd.get("pose"))||"warrior2";
+    const view=textVal(fd.get("view"))||"front";
+    const level=textVal(fd.get("level"))||"normal";
     optsCheck(pose,view,level);
     const file=fd.get("file");
     if(!(file instanceof File))throw new Error("视频文件不能为空。");
@@ -271,50 +263,60 @@ export async function browserApi(path:string,options:RequestInit={}):Promise<any
     if(!allowedVideos.has(suffix))throw new Error("视频格式不支持，请选择MP4、MOV、AVI、MKV或WebM。");
     if(file.size>120*1024*1024)throw new Error("文件不能超过120MB。");
     const opts:Options={pose,view:view as View,level:level as Level,studentName:nameValue(fd.get("student_name"))};
-    const url=URL.createObjectURL(file),video=document.createElement("video");
-    video.src=url;video.style.display="none";document.body.appendChild(video);
+    emitProgress(options,"decoding",new PythonVideoEvaluator().stats,0,0);
+    const decoder=await BrowserVideoDecoder.open(file);
     let model:PoseDetector|null=null;
     try{
-      await videoMetadata(video);
-      if(!Number.isFinite(video.duration)||video.duration<=0)throw new Error("视频长度无效。");
       model=await createPoseDetector();
       const engine=new VectorBodyEngine(opts.level);
-      // Python OpenCV: read every 2nd decoded frame, limit to 1800 processed.
-      // Browser HTMLVideoElement doesn't expose exact source FPS: 30 is fallback.
-      const fps=await inferVideoFps(file),stride=PYTHON_VIDEO_FRAME_STRIDE,maxProcessed=PYTHON_VIDEO_MAX_PROCESSED;
-      const totalFrames=Math.min(maxProcessed,Math.floor(video.duration*fps/stride));
-      let processed=0,good=0,best:PythonResult|null=null,original:string|null=null,skeleton:string|null=null;
-      const hold=new PythonStableHold();
+      // Preserve Python OpenCV stride=2 and maximum=1800 processed frames.
+      // Source FPS is read from MP4 metadata where possible.
+      const fps=await inferVideoFps(file),stride=PYTHON_VIDEO_FRAME_STRIDE;
+      const totalFrames=Math.min(PYTHON_VIDEO_MAX_PROCESSED,Math.floor(decoder.duration*fps/stride));
+      const evaluation=new PythonVideoEvaluator();
+      let best:PythonResult|null=null,original:string|null=null,skeleton:string|null=null;
       for(let frame=2;frame<=totalFrames*stride;frame+=stride){
         const t=frame/fps;
-        if(t>=video.duration)break;
-        await seek(video,Math.max(0,Math.min(t,video.duration-0.025)));
-        processed++;
-        const p=model.detect(video,t*1000);
-        const display=displayPoints(p);
-        if(!p||!display||!inView(p)||!centered(p,video.videoWidth,video.videoHeight)){
-          hold.reset();continue;
+        if(t>=decoder.duration)break;
+        const canvas=await decoder.frame(Math.max(0,Math.min(t,decoder.duration-0.025)));
+        // Canvas freezes precisely the decoded frame for both pose estimation
+        // and the best-frame photographic evidence.
+        const landmarks=model.detect(canvas,t*1000);
+        const inspected=evaluation.inspect(t,landmarks,decoder.width,decoder.height);
+        if(inspected.stage==="ready" && landmarks && inspected.display){
+          const score=engine.analyze(landmarks,opts.pose,opts.view);
+          evaluation.evaluated(!!score);
+          if(score){
+            const result=realScore(score,inspected.display,frame,rounded(t,2),opts);
+            if(!best||result.score>best.score){
+              best=result;
+              original=snapshot(canvas,decoder.width,decoder.height,inspected.display,false);
+              skeleton=snapshot(canvas,decoder.width,decoder.height,inspected.display,true,result.issue_regions);
+            }
+          }
         }
-        const current=centerPoint(display);
-        if(!hold.observe(t,current))continue;
-        const scored=engine.analyze(p,opts.pose,opts.view);
-        if(!scored)continue;
-        good++;
-        const result=realScore(scored,display,frame,rounded(t,2),opts);
-        if(!best||result.score>best.score){
-          best=result;
-          original=snapshot(video,video.videoWidth,video.videoHeight,display,false);
-          skeleton=snapshot(video,video.videoWidth,video.videoHeight,display,true,result.issue_regions);
+        // Python threshold and scoring criteria are unchanged.
+        // Progress information is diagnostic only, never a fallback score.
+        if(evaluation.stats.processed%6===0){
+          emitProgress(options,"analyzing",evaluation.stats,totalFrames,t);
+          await new Promise<void>(resolve=>setTimeout(resolve,0));
         }
-        // Yield to UI during long videos.
-        if(processed%18===0)await new Promise<void>(r=>setTimeout(r,0));
       }
-      if(!best)throw new Error("未找到稳定2秒以上的有效姿态。请确认全身入镜、正侧位和动作选择正确。");
+      emitProgress(options,"analyzing",evaluation.stats,totalFrames,decoder.duration);
+      if(!best)throw new Error(videoFailureReason(evaluation.stats));
+      emitProgress(options,"archiving",evaluation.stats,totalFrames,best.time_sec??decoder.duration);
       const reportId=await archive(opts,"video",best,original,skeleton);
-      return {ok:true,report_id:reportId,pose:{id:opts.pose,name:names[opts.pose],view:opts.view,level:opts.level},
-        result:best,video:{processed_frames:processed,evaluated_frames:good,best_frame:best.frame_index,best_time_sec:best.time_sec},
-        notice:"仅用于教学辅助，不替代教师判断或医疗诊断。"};
-    }finally{model?.close();video.pause();video.removeAttribute("src");video.load();video.remove();URL.revokeObjectURL(url)}
+      return {ok:true,report_id:reportId,
+        pose:{id:opts.pose,name:names[opts.pose],view:opts.view,level:opts.level},
+        result:best,video:{
+          processed_frames:evaluation.stats.processed,
+          evaluated_frames:evaluation.stats.evaluated,
+          best_frame:best.frame_index,best_time_sec:best.time_sec
+        },notice:"仅用于教学辅助，不替代教师判断或医疗诊断。"};
+    }finally{
+      model?.close();
+      decoder.close();
+    }
   }
   if(path==="/api/reports"&&method==="GET"){
     const reports=(await listReports()).slice(0,100).map(r=>({
