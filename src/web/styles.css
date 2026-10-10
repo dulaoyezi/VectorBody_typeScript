@@ -63,3 +63,25 @@
 /* Keep upload pipeline diagnostics legible after long video processing. */
 #upload-info{white-space:normal;overflow-wrap:anywhere;line-height:1.65;max-width:100%;display:inline-block}
 #upload-badge{white-space:nowrap}
+
+
+/* Keep save/export actions available beside completed assessments. */
+.report-actions{display:flex;gap:10px;flex-wrap:wrap;margin:18px 24px 4px}
+.report-actions>.btn{flex:1 1 190px}
+@media(max-width:420px){.report-actions{margin:16px 14px 4px}}
+/* PDF is created from the detailed evidence, not a hidden live/video screen. */
+@media print{
+  @page{size:A4;margin:12mm}
+  html,body,.site{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;box-shadow:none!important}
+  #page-reports .page-intro,#report-detail>.panel-title,.nav-bar,footer,#toast{display:none!important}
+  #page-reports{display:block!important}
+  #report-detail{display:block!important;margin:0!important;border:0!important;box-shadow:none!important;overflow:visible!important}
+  #report-detail[hidden]{display:none!important}
+  #report-content{display:block!important}
+  #report-content .detail-body{padding:0!important}
+  .metric-table{width:100%;break-inside:auto}
+  .metric-table thead{display:table-header-group}
+  .metric-table tr{break-inside:avoid}
+  .detail-head,.report-dims,.detail-advice,.report-evidence{break-inside:avoid}
+  .archive-photo img,.anatomy-image-shell img{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+}
