@@ -86,3 +86,35 @@
   .pdf-report .anatomy-note{font-size:8px}
   .pdf-report .pdf-section{margin:12px 0}
 }
+
+
+/* Additional original Python Web homepage layout: two entry cards and engine credibility */
+.python-section-heading{display:flex;align-items:end;justify-content:space-between;gap:22px;margin:74px 6px 25px}
+.python-section-kicker{font-size:11px;letter-spacing:.22em;color:#a58e57;font-weight:750}
+.python-section-heading h2{font:700 32px "STSong","Noto Serif SC",serif;margin:10px 0 0;color:#263a2d}
+.python-section-heading p{color:#778176;line-height:1.8;font-size:13px;margin:0}
+.python-entry-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.python-entry-card{display:flex;align-items:center;text-align:left;gap:20px;padding:31px;border-radius:20px;background:#fffefa;border:1px solid #e6e8dd;box-shadow:0 8px 28px rgba(50,67,48,.045);transition:transform .2s,box-shadow .2s}
+.python-entry-card:hover{transform:translateY(-4px);box-shadow:0 16px 48px rgba(38,59,45,.07)}
+.python-entry-icon{width:63px;height:63px;min-width:63px;display:grid;place-items:center;border-radius:18px;background:#eaf0e5;color:#586e50;font-size:28px}
+.python-entry-icon.gold{background:#faf0d9;color:#ad8840}
+.python-entry-card small{display:block;font-size:10px;color:#a6a896;letter-spacing:.09em}
+.python-entry-card strong{display:block;color:#263b2d;font-size:20px;margin:9px 0}
+.python-entry-card span>span{display:block;color:#778176;font-size:12px;line-height:1.7}
+.python-entry-arrow{margin-left:auto;color:#81977a;font-size:21px}
+.python-credibility{display:flex;gap:20px;justify-content:space-between;align-items:center;margin:20px 0 78px;padding:29px 34px;border-radius:20px;background:linear-gradient(110deg,#e8ece2,#f6f1e6)}
+.python-credibility strong{display:block;margin:9px 0;font-size:20px;color:#344c37}
+.python-credibility p{font-size:12px;color:#7a8775;line-height:1.9;margin:0}
+.python-cred-badge{display:flex;align-items:center;gap:12px;white-space:nowrap;color:#435d48;font-weight:750;font-size:12px}
+.python-cred-badge>span{font-size:33px;color:#83997d}
+.python-cred-badge small{font-weight:400;color:#8c9688}
+@media(max-width:750px){
+  .python-section-heading{margin:38px 0 22px;align-items:start;flex-direction:column}
+  .python-section-heading h2{font-size:25px}
+  .python-entry-grid{grid-template-columns:1fr}
+  .python-entry-card{padding:22px}
+  .python-entry-icon{width:52px;height:52px;min-width:52px}
+  .python-entry-card strong{font-size:17px}
+  .python-credibility{margin-bottom:36px;padding:24px;flex-direction:column;align-items:start}
+  .python-cred-badge{align-self:end}
+}

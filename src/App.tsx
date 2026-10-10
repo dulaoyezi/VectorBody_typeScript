@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import PythonHero from "./components/PythonHero";
+import PythonHomeSections from "./components/PythonHomeSections";
 import AnatomyView from "./components/AnatomyView";
 import ReportDocument from "./components/ReportDocument";
 import { centered, inView, VectorBodyEngine } from "./core/compensationRiskEngine";
@@ -300,12 +301,7 @@ export default function App() {
     <main>
       {tab==="home"&&<div className="home">
         <PythonHero onLive={()=>navigate("live")} onVideo={()=>navigate("video")}/>
-        <section className="feature-grid">
-          <div className="feature"><div className="feature-num">01 / PERCEPTION</div><div className="feature-icon">◎</div><h3>视觉姿态感知</h3><p>MediaPipe 提取人体 33 个关键点，实时可视化运动链与身体轴线。</p></div>
-          <div className="feature"><div className="feature-num">02 / RECONSTRUCTION</div><div className="feature-icon">⌁</div><h3>拓扑与 DLS 优化</h3><p>骨盆根人体拓扑树、虚拟骨长约束与阻尼最小二乘姿态稳定。</p></div>
-          <div className="feature"><div className="feature-num">03 / FEEDBACK</div><div className="feature-icon">↗</div><h3>多维可解释反馈</h3><p>S1 姿态符合性、S2 稳定性、S3 视觉支撑代理，定位偏差并给出建议。</p></div>
-        </section>
-        <section className="wide-note"><div><div className="eyebrow">DESIGNED FOR PRACTICE</div><h2>从一次动作，<br/>到持续进步的证据。</h2></div><p>支持八种体式、正面与侧面视角、两种难度模式。评估结果可手动保存于当前浏览器。评分仅供教学辅助，不替代教师判断或医学诊断。</p></section>
+        <PythonHomeSections onLive={()=>navigate("live")} onVideo={()=>navigate("video")}/>
       </div>}
       {(tab==="live"||tab==="video")&&<div className="workspace">
         <div className="workspace-title"><div><div className="eyebrow">PRACTICE STUDIO / {tab==="live"?"LIVE":"VIDEO"}</div>
