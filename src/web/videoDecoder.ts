@@ -36,7 +36,13 @@ export async function waitForVideoData(video:HTMLVideoElement, timeout=LOAD_TIME
 export async function seekDecodedVideo(video:HTMLVideoElement,time:number, timeout=SEEK_TIMEOUT_MS):Promise<void> {
   if(!Number.isFinite(time)||time<0)throw new Error("视频帧时间戳不正确。");
   if(video.error)throw new Error("浏览器视频解码失败。");
-  if(Math.abs(video.currentTime-time)>0.0008 || video.readyState<HAVE_FRAME){
+  // Assigning currentTime to its existing value does not reliably fire "seeked".
+  // Wait for initial decoded data directly rather than timing out on a missing event.
+  if(Math.abs(video.currentTime-time)<=0.0008 && !video.seeking){
+    await waitForVideoData(video,timeout);
+    return;
+  }
+  {
     await new Promise<void>((resolve,reject)=>{
       const timer=setTimeout(()=>done(new Error("视频逐帧定位超时。")),timeout);
       const onSeeked=()=>done();
