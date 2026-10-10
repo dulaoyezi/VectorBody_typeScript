@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir:"./browser_tests",
+  testMatch:"**/*.e2e.ts",
   timeout:120_000,
   retries:0,
   use:{...devices["Desktop Chrome"],baseURL:"http://127.0.0.1:5173",headless:true},
