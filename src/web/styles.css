@@ -59,3 +59,7 @@
 
 /* 唯一业务功能扩展：受评者姓名，不改变原版页面其它布局 */
 .name-control{display:flex;align-items:center;gap:12px;padding:0 19px 19px;flex-wrap:wrap}.name-control label{font-size:12px;font-weight:700;color:#586d53}.name-control input{flex:1;min-width:190px;max-width:440px;border:1px solid #d9e2d5;background:#fffefa;border-radius:10px;padding:11px 12px;font-size:13px;outline-color:#8aa37d}.name-control span{font-size:10px;color:#879484}
+
+/* Keep upload pipeline diagnostics legible after long video processing. */
+#upload-info{white-space:normal;overflow-wrap:anywhere;line-height:1.65;max-width:100%;display:inline-block}
+#upload-badge{white-space:nowrap}
