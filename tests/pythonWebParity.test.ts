@@ -1,6 +1,5 @@
 import { describe,expect,it } from "vitest";
 import rawHtml from "../index.html?raw";
-import rawCSS from "../src/web/styles.css?raw";
 import source from "../src/web/main.ts?raw";
 import { PythonStableHold, PYTHON_VIDEO_FRAME_STRIDE, PYTHON_VIDEO_MAX_PROCESSED,
   PYTHON_STABLE_SECONDS, PYTHON_STABLE_CENTER_MOVE, PYTHON_SCORE_WEIGHTS } from "../src/web/pythonParity";
@@ -46,8 +45,8 @@ describe("Python VectorBody Web behavioral parity",()=>{
       expect(rawHtml).toContain('id="'+id+'"');
     }
     expect(rawHtml).toContain('class="yoga-figure"');
-    expect(rawCSS).toContain(".yoga-figure");
-    expect(rawCSS).toContain(".anatomy-widget");
+    expect(rawHtml).toContain('class="anatomy-details"');
+    expect(rawHtml).toContain('id="live-anatomy-host"');
   });
   it("preserves automatic session archive, video report and print controls",()=>{
     for(const fragment of ["/api/live/start","/api/live/frame","/api/live/stop",
