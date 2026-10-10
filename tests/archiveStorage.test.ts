@@ -34,6 +34,12 @@ describe("auto archived report integrity",()=>{
     expect(stored?.originalImage).toContain("/9j/RAW");
     expect(stored?.image).toContain("/9j/SKELETON");
     expect((await listReports()).some(r=>r.id===id)).toBe(true);
+    await saveReport({...report,studentName:"复核后的学生",result:{...result!,score:81}});
+    const updated=await readReport(id);
+    expect(updated?.studentName).toBe("复核后的学生");
+    expect(updated?.result.score).toBe(81);
+    expect(updated?.originalImage).toContain("/9j/RAW");
+    expect((await listReports()).filter(r=>r.id===id)).toHaveLength(1);
     await deleteReport(id);
     expect(await readReport(id)).toBeUndefined();
   });

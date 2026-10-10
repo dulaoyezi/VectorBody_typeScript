@@ -51,7 +51,11 @@ test("Original video flow: upload, stable gate, real math, IndexedDB archive, re
   await page.locator("#video-student-name").fill("视频端到端测试");
   await page.locator("#video-file").setInputFiles(asset);
   await page.locator("#analyze-video").click();
-  await expect(page.locator("#upload-badge")).toHaveText("分析完成",{timeout:110_000});
+  await expect(page.locator("#upload-badge")).toHaveText("已保存报告",{timeout:110_000});
+  await expect(page.locator("#save-video-report")).toBeEnabled();
+  await expect(page.locator("#print-video-report")).toBeEnabled();
+  await page.locator("#save-video-report").click();
+  await expect(page.locator("#upload-badge")).toHaveText("已保存报告");
   await expect(page.locator("#show-video-report")).toBeEnabled();
   await page.locator("#show-video-report").click();
   await expect(page.locator("#report-detail")).toBeVisible();
@@ -77,4 +81,53 @@ test("Original video flow: upload, stable gate, real math, IndexedDB archive, re
   });
   expect(archived.some(x=>x.studentName==="视频端到端测试"&&
     x.hasRaw&&x.hasSkeleton&&x.score>=0&&x.score<=100)).toBe(true);
+  expect(archived).toHaveLength(1); // Manual save updates, rather than duplicating, automatic archive.
+  await page.evaluate(()=>{
+    (window as any).__printCalls=0;
+    window.print=()=>{(window as any).__printCalls++;};
+  });
+  await page.locator("#print-report").click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__printCalls)).toBe(1);
+  await page.reload();
+  await page.locator('[data-go="reports"]').first().click();
+  await expect(page.locator("#reports-list")).toContainText("视频端到端测试");
+  await page.locator("#reports-list [data-report]").first().click();
+  await expect(page.locator("#report-content")).toContainText("视频端到端测试");
+});
+
+test("A real score remains viewable and printable when IndexedDB is blocked",async({page})=>{
+  const points=Array.from({length:33},()=>({x:.5,y:.5,z:0,visibility:1}));
+  const coords:Record<number,[number,number]>={
+    0:[.5,.14],7:[.46,.16],8:[.54,.16],11:[.4,.32],12:[.6,.32],
+    15:[.32,.57],16:[.68,.57],23:[.44,.57],24:[.56,.57],
+    25:[.43,.74],26:[.58,.75],27:[.42,.89],28:[.58,.89],
+    29:[.41,.89],30:[.59,.89],31:[.40,.92],32:[.60,.92]
+  };
+  for(const [id,[x,y]] of Object.entries(coords))points[Number(id)]={x,y,z:0,visibility:1};
+  await page.route(/\/src\/vision\/pose\.ts(?:\?.*)?$/,async route=>{
+    await route.fulfill({status:200,contentType:"text/javascript",body:
+      "export async function createPoseDetector(){return {detect(){return "+
+      JSON.stringify(points)+";},close(){}};}"});
+  });
+  await page.addInitScript(()=>{
+    Object.defineProperty(window.indexedDB,"open",{configurable:true,value:()=>{
+      throw new Error("blocked IndexedDB");
+    }});
+    (window as any).__printCalls=0;
+    window.print=()=>{(window as any).__printCalls++;};
+  });
+  await page.goto("/");
+  await page.locator('[data-go="video"]').first().click();
+  await page.locator("#video-student-name").fill("离线打印测试");
+  await page.locator("#video-file").setInputFiles(asset);
+  await page.locator("#analyze-video").click();
+  await expect(page.locator("#upload-badge")).toHaveText("评分完成 · 待保存",{timeout:110_000});
+  await expect(page.locator("#video-score")).not.toHaveText("—");
+  await expect(page.locator("#show-video-report")).toBeEnabled();
+  await expect(page.locator("#save-video-report")).toBeEnabled();
+  await page.locator("#show-video-report").click();
+  await expect(page.locator("#report-content")).toContainText("离线打印测试");
+  await expect(page.locator("#archive-photo")).toBeVisible();
+  await page.locator("#print-report").click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__printCalls)).toBe(1);
 });
